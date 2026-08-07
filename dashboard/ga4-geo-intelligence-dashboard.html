@@ -1383,7 +1383,20 @@ function renderDrawer(){
   });
   body.innerHTML = html;
   allFilterFields().filter(f=>f.live && f.type==='ms').forEach(f=> wireMultiSelect(f.key));
+  allFilterFields().filter(f=>f.type==='date').forEach(f=>{
+    const s = $('#flt_'+f.key+'_start'), e = $('#flt_'+f.key+'_end');
+    const onDateChange = ()=>{
+      STATE.filters[f.key] = { start: s.value || STATE.D.dateBounds.min, end: e.value || STATE.D.dateBounds.max };
+      scheduleAutoApply();
+    };
+    if(s) s.addEventListener('change', onDateChange);
+    if(e) e.addEventListener('change', onDateChange);
+  });
 }
+// Filters feel instant: any change in the drawer (checkbox or date) re-renders
+// the page behind it after a short debounce, instead of requiring an explicit
+// Apply click. The Apply/✓ button still works too (applies immediately, no wait).
+const scheduleAutoApply = debounce(()=>{ updateFilterChip(); renderActivePage(); }, 400);
 function renderMultiSelect(key, label, options){
   const selected = sel(key) || [];
   return `<div class="fgroup"><label>${esc(label)} <span style="color:var(--muted);font-weight:400">(${options.length} options)</span></label>
@@ -1425,6 +1438,7 @@ function toggleMsValue(key, val){
   STATE.filters[key] = cur;
   renderDrawer();
   const drop = $('#msdrop_'+key); if(drop) setTimeout(()=>drop.classList.add('on'),0);
+  scheduleAutoApply();
 }
 function openDrawer(){ renderDrawer(); $('#drawer').classList.add('on'); $('#overlay').classList.add('on'); }
 function closeDrawer(){ $('#drawer').classList.remove('on'); $('#overlay').classList.remove('on'); }
