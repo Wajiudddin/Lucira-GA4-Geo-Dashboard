@@ -855,7 +855,7 @@ function SAMPLE_FALLBACK(){
     campaigns: cities.flatMap(c=>['google/cpc/brand','meta/paid_social/retarget','direct/(none)/(not set)'].map(cm=>{ const [source,medium,campaign_name]=cm.split('/'); return {city:c, source, medium, campaign_name, channel_type:'Paid', sessions:800, pdp_views:2000, add_to_cart:150, begin_checkout:50, purchase:8, revenue:64000}; })),
     products: [], topProducts: [], devices: cities.flatMap(c=>['mobile','desktop'].map(d=>({city:c, device:d, sessions:2000, pdp_views:6000, add_to_cart:400, purchase:20, revenue:160000}))),
     zohoCity: cities.slice(0,3).map((c,i)=>({city:c, state:'—', deals:40-i*10, won:2-i, lost:15-i*3, open_deals:23-i*6, amount:0, won_amount:0, avg_probability:20-i*2, avg_deal_score:6-i, top_lead_source:'Website', top_utm_source:'Meta'})),
-    zohoPincode: cities.slice(0,3).map((c,i)=>({pincode:'40000'+i, city:c, state:'—', deals:12-i*3, won:1, amount:0})),
+    zohoPincode: cities.slice(0,3).map((c,i)=>({pincode:'40000'+i, city:c, state:'—', d:mkDaily(1)[0].d, deals:12-i*3, won:1, amount:0})),
     zohoDaily: mkDaily(3).map(r=>({d:r.d, deals:Math.round(3+Math.random()*4), amount:0, won:Math.round(Math.random()), lost:Math.round(Math.random())})),
     zohoStages:[{stage:'Prospect',n:60,amount:0},{stage:'Closed Lost',n:28,amount:0},{stage:'Closed Won',n:5,amount:40000}],
     zohoLeadSource:[{lead_source:'Website',n:78,won:4,amount:35000},{lead_source:'Meta Ads',n:12,won:1,amount:5000}],
@@ -1325,7 +1325,22 @@ function filteredZohoDaily(){ return STATE.D.RAW.zohoDaily.filter(r=>inDateRange
 function filteredZohoCity(){ return STATE.D.RAW.zohoCity.filter(r=> matchMulti('city', normCity(r.city))); }
 function filteredZohoStages(){ return sel('dealStage') ? STATE.D.RAW.zohoStages.filter(r=>sel('dealStage').includes(r.stage)) : STATE.D.RAW.zohoStages; }
 function filteredZohoLeadSource(){ return sel('leadSource') ? STATE.D.RAW.zohoLeadSource.filter(r=>sel('leadSource').includes(r.lead_source)) : STATE.D.RAW.zohoLeadSource; }
-function filteredZohoPincode(){ return (STATE.D.RAW.zohoPincode||[]).filter(r=> matchMulti('city', normCity(r.city)) && matchMulti('pincode', r.pincode)); }
+function filteredZohoPincode(){
+  // zohoPincode is day-level (one row per pincode per day it had deal activity) so the date
+  // range filter can actually change these numbers -- re-aggregate back to one row per pincode
+  // across whichever window is currently selected.
+  const dayRows = (STATE.D.RAW.zohoPincode||[]).filter(r=> inDateRange(r.d) && matchMulti('city', normCity(r.city)) && matchMulti('pincode', r.pincode));
+  const byPin = new Map();
+  for(const r of dayRows){
+    let cur = byPin.get(r.pincode);
+    if(!cur){ cur = {pincode:r.pincode, city:r.city, state:r.state, area:r.area, deals:0, won:0, amount:0}; byPin.set(r.pincode, cur); }
+    cur.deals += n(r.deals); cur.won += n(r.won); cur.amount += n(r.amount);
+    if(!cur.city && r.city) cur.city = r.city;
+    if(!cur.state && r.state) cur.state = r.state;
+    if(!cur.area && r.area) cur.area = r.area;
+  }
+  return Array.from(byPin.values());
+}
 function filteredSessionAnalysis(){ return (STATE.D.RAW.sessionAnalysis||[]).filter(r=> matchMulti('campaignSource', r.source) && matchMulti('campaignMedium', r.medium) && matchMulti('campaignName', r.campaign)); }
 
 /* ============================== 13. KPI CARD ============================== */
@@ -2136,7 +2151,7 @@ PAGE_RENDERERS.pincode = function(){
 
   return `
   ${renderChipsRow()}
-  <div class="sec-head"><div><h2>Pin Code Intelligence</h2><p>Pin Code, City, State, Deals Created and Closed Won are <b>real</b> (Zoho <code>Address_Zip</code>). Sessions, PDP, Users, ATC, Checkout and Orders are <b>modelled</b> — GA4 has no postal dimension at all and the ERP feed has no pin code either, so these are allocated from that pin code's real city-level GA4/ERP totals, weighted by its share of real deals within the city (marked * throughout). Known/Identified Users has no source at ANY grain and is never modelled — shown as N/A, not estimated. <b>CaratLane columns are a real competitive layer</b> — exact pin-code matches against 112 of an estimated 230+ CaratLane stores nationwide (their own public catalog pages, not stock data — see hint below).</p></div>
+  <div class="sec-head"><div><h2>Pin Code Intelligence</h2><p>Pin Code, City, State, Deals Created and Closed Won are <b>real</b> (Zoho <code>Address_Zip</code>) and fully respond to the date range filter — each deal carries its own creation date. Sessions, PDP, Users, ATC, Checkout and Orders are <b>modelled</b> — GA4 has no postal dimension at all and the ERP feed has no pin code either, so these are allocated from that pin code's <b>city-level GA4/ERP totals for the whole connected window</b> (not day-filtered — city totals aren't tracked daily), weighted by its share of real deals within the city <b>for whatever date range is selected</b> (marked * throughout). Narrowing to a single day changes the real columns correctly but will make the modelled columns look disproportionately large for that day — they're still a full-window city amount split by that day's deal share, not a same-day estimate. Known/Identified Users has no source at ANY grain and is never modelled — shown as N/A, not estimated. <b>CaratLane columns are a real competitive layer</b> — exact pin-code matches against 112 of an estimated 230+ CaratLane stores nationwide (their own public catalog pages, not stock data — see hint below).</p></div>
     <span class="chip warn">○ ${fmtInt(rows.length)} pin codes tracked · ${cov.deals_with_city_pct}%-class Zoho coverage</span></div>
 
   <div class="grid kpi-grid" style="margin-bottom:4px">
