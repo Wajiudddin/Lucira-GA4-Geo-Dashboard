@@ -346,7 +346,6 @@ select.inp:focus,input.inp:focus{border-color:var(--gold)}
 </div>
 
 <script src="geo_intel_data.js"></script>
-<script src="caratlane_intel_data.js"></script>
 <script>
 /* GA4 Geo Intelligence Dashboard — main application script.
    Built on top of the earlier City Intelligence & Market Expansion engine (same
@@ -2081,8 +2080,9 @@ function erpCityRowFor(cityNorm){
 }
 
 /* Competitor layer — CaratLane real store presence, matched by EXACT pin code string
-   (dashboard/caratlane_intel_data.js — 112 of an estimated 230+ CaratLane stores nationwide,
-   collected from CaratLane's own public store-catalog pages, not a licensed dataset).
+   (GEO_INTEL_DATA.caratlaneStores, sourced from etl/caratlane_stores.json — 206 of an
+   estimated 230+ CaratLane stores nationwide, collected from CaratLane's own public
+   store-catalog pages, not a licensed dataset).
    "Catalog items" = CaratLane's own ONLINE CATALOG LISTING count for that store — a public
    proxy for local assortment depth, NOT audited stock (no retailer publishes real per-store
    inventory, ours included). A pin code showing no CaratLane store here means none was FOUND
@@ -2099,7 +2099,7 @@ const CARATLANE_PB_BANDS = [
 ];
 const CARATLANE_BY_PINCODE = (() => {
   const m = new Map();
-  (window.CARATLANE_STORES||[]).forEach(s=>{
+  ((window.GEO_INTEL_DATA && window.GEO_INTEL_DATA.caratlaneStores) || []).forEach(s=>{
     if(!s.pincode) return;
     let total = 0; CARATLANE_CAT_KEYS.forEach(k=>{ if(s.cat && s.cat[k]) total += s.cat[k]; });
     const key = String(s.pincode).trim();
@@ -2153,7 +2153,7 @@ PAGE_RENDERERS.pincode = function(){
 
   return `
   ${renderChipsRow()}
-  <div class="sec-head"><div><h2>Pin Code Intelligence</h2><p>Pin Code, City, State, Deals Created and Closed Won are <b>real</b> (Zoho <code>Address_Zip</code>). Sessions, PDP, Users, ATC and Checkout are <b>modelled</b> — GA4 has no postal dimension at all, so these are allocated from that pin code's city-level GA4 totals <b>for the currently selected date range</b> (city sessions/pdp/etc. are tracked day-by-day, same as the pin code deals), weighted by its share of real deals within the city for that same range (marked * throughout) — narrowing to a single day changes both consistently. <b>Orders*</b> is the one exception: it comes from the ERP feed, which is fetched as a live full snapshot with no date dimension, so it does not shrink with the date filter. Known/Identified Users has no source at ANY grain and is never modelled — shown as N/A, not estimated. <b>CaratLane columns are a real competitive layer</b> — exact pin-code matches against 112 of an estimated 230+ CaratLane stores nationwide (their own public catalog pages, not stock data — see hint below).</p></div>
+  <div class="sec-head"><div><h2>Pin Code Intelligence</h2><p>Pin Code, City, State, Deals Created and Closed Won are <b>real</b> (Zoho <code>Address_Zip</code>). Sessions, PDP, Users, ATC and Checkout are <b>modelled</b> — GA4 has no postal dimension at all, so these are allocated from that pin code's city-level GA4 totals <b>for the currently selected date range</b> (city sessions/pdp/etc. are tracked day-by-day, same as the pin code deals), weighted by its share of real deals within the city for that same range (marked * throughout) — narrowing to a single day changes both consistently. <b>Orders*</b> is the one exception: it comes from the ERP feed, which is fetched as a live full snapshot with no date dimension, so it does not shrink with the date filter. Known/Identified Users has no source at ANY grain and is never modelled — shown as N/A, not estimated. <b>CaratLane columns are a real competitive layer</b> — exact pin-code matches against 206 of an estimated 230+ CaratLane stores nationwide (their own public catalog pages, not stock data — see hint below).</p></div>
     <span class="chip warn">○ ${fmtInt(rows.length)} pin codes tracked · ${cov.deals_with_city_pct}%-class Zoho coverage</span></div>
 
   <div class="grid kpi-grid" style="margin-bottom:4px">
@@ -2185,7 +2185,7 @@ PAGE_RENDERERS.pincode = function(){
   ].concat(CARATLANE_CAT_KEYS.map(k=> [r.clCat[k]?fmtInt(r.clCat[k]):'—', r.clCat[k]||0]))
    .concat(CARATLANE_PB_BANDS.map(b=> [r.clPb[b.key]?fmtInt(r.clPb[b.key]):'—', r.clPb[b.key]||0]))
   ), {title:'Pin Code Detail  ·  * = modelled (allocated from real city totals by deal-share, not directly measured)  ·  † = CaratLane public catalog listing count, not stock', searchable:true,
-    hint:'Area = the locality/post-office name(s) served by that pin code, resolved from the public India Post pincode directory (api.postalpincode.in) — real reference data, not modelled from Lucira\'s own sources (no Pin→Area field exists in Zoho or GA4). Pin codes covering many post offices show the first few + a "+N more" count rather than picking one arbitrarily; "—" means the directory had no record for that (or a malformed) pin code. Modelled columns assume a pin code\'s share of its city\'s real GA4/ERP activity equals its share of real Zoho deals within that city — a reasonable proxy, not a measurement. Pin codes with very few deals (1-2) produce noisy modelled numbers; treat those directionally only, and lean on the Deals Created / Closed Won columns (real) for anything decision-critical. <b>Every "CaratLane…†" column</b> (Here / Store(s) / Total Inventory / per-category Rings…Nose pin / per-price-band &lt;₹5k…₹30-40k) comes straight from the same table as the standalone CaratLane Competitive Intelligence dashboard (dashboard/caratlane_intel_data.js) — 112 of an estimated 230+ CaratLane stores nationwide, matched to this row by EXACT pin code string, summed across stores if more than one CaratLane store shares that pin code. "No"/"—" means no CaratLane store was found in our captured 112 at that exact pin code — it is not proof CaratLane has zero presence there (they may have a store we did not capture, or one just outside this pin code in the same locality). Every CaratLane figure is that store\'s own ONLINE CATALOG LISTING count (a public assortment-depth proxy), not audited stock — no retailer publishes real per-store inventory, Lucira included; each store page also lists more categories/bands than captured, so these are a floor. Click column headers to sort — e.g. sort by real Deals Created descending, then scan the CaratLane columns, to spot high-demand pin codes CaratLane has not yet reached.'})}
+    hint:'Area = the locality/post-office name(s) served by that pin code, resolved from the public India Post pincode directory (api.postalpincode.in) — real reference data, not modelled from Lucira\'s own sources (no Pin→Area field exists in Zoho or GA4). Pin codes covering many post offices show the first few + a "+N more" count rather than picking one arbitrarily; "—" means the directory had no record for that (or a malformed) pin code. Modelled columns assume a pin code\'s share of its city\'s real GA4/ERP activity equals its share of real Zoho deals within that city — a reasonable proxy, not a measurement. Pin codes with very few deals (1-2) produce noisy modelled numbers; treat those directionally only, and lean on the Deals Created / Closed Won columns (real) for anything decision-critical. <b>Every "CaratLane…†" column</b> (Here / Store(s) / Total Inventory / per-category Rings…Nose pin / per-price-band &lt;₹5k…₹30-40k) comes from the same underlying dataset as the standalone CaratLane Competitive Intelligence dashboard (etl/caratlane_stores.json, embedded into this dashboard\'s own GEO_INTEL_DATA.caratlaneStores) — 206 of an estimated 230+ CaratLane stores nationwide, matched to this row by EXACT pin code string, summed across stores if more than one CaratLane store shares that pin code. "No"/"—" means no CaratLane store was found in our captured 206 at that exact pin code — it is not proof CaratLane has zero presence there (they may have a store we did not capture, or one just outside this pin code in the same locality). Every CaratLane figure is that store\'s own ONLINE CATALOG LISTING count (a public assortment-depth proxy), not audited stock — no retailer publishes real per-store inventory, Lucira included; each store page also lists more categories/bands than captured, so these are a floor. Click column headers to sort — e.g. sort by real Deals Created descending, then scan the CaratLane columns, to spot high-demand pin codes CaratLane has not yet reached.'})}
 
   <div class="card" style="margin-top:16px">
     <h3 style="font-size:14px;margin-bottom:10px">✦ Store-Opening Candidates — Pin Code Level</h3>

@@ -1,8 +1,9 @@
 name: Deploy Dashboard to Pages
 
-# Publishes dashboard/ga4-geo-intelligence-dashboard.html (+ its two bundled
-# static data files) to GitHub Pages at the repo root. Static snapshot only —
-# no live API keys or credentials embedded.
+# Publishes dashboard/ga4-geo-intelligence-dashboard.html (+ its bundled
+# geo_intel_data.js, which also carries the CaratLane competitive dataset)
+# to GitHub Pages at the repo root. Static snapshot only — no live API keys
+# or credentials embedded.
 #
 # One-time setup required before this can go live: repo Settings → Pages →
 # "Build and deployment" → Source: "GitHub Actions".
@@ -34,7 +35,6 @@ jobs:
           touch _site/.nojekyll
           cp dashboard/ga4-geo-intelligence-dashboard.html _site/index.html
           cp dashboard/geo_intel_data.js _site/geo_intel_data.js
-          cp dashboard/caratlane_intel_data.js _site/caratlane_intel_data.js
           cp CNAME _site/CNAME
           grep -q "Geo Intelligence" _site/index.html || { echo "::error::dashboard content missing"; exit 1; }
 
