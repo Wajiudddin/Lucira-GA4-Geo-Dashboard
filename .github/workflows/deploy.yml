@@ -35,7 +35,6 @@ jobs:
           touch _site/.nojekyll
           cp dashboard/ga4-geo-intelligence-dashboard.html _site/index.html
           cp dashboard/geo_intel_data.js _site/geo_intel_data.js
-          cp CNAME _site/CNAME
           grep -q "Geo Intelligence" _site/index.html || { echo "::error::dashboard content missing"; exit 1; }
 
       - uses: actions/upload-pages-artifact@v3
