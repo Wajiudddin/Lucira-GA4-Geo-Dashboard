@@ -250,12 +250,6 @@ select.inp:focus,input.inp:focus{border-color:var(--gold)}
 .tabs{display:flex;gap:6px;border-bottom:1px solid var(--hair);margin-bottom:14px;flex-wrap:wrap}
 .tabs button{padding:9px 14px;font-size:12px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent}
 .tabs button.on{color:var(--gold-2);border-color:var(--gold)}
-.topTabs{position:sticky;top:var(--topbar-h);z-index:55;display:flex;gap:4px;overflow-x:auto;padding:9px clamp(14px,3vw,26px);background:var(--bg-2);border-bottom:1px solid var(--hair);backdrop-filter:blur(14px)}
-.topTabs::-webkit-scrollbar{height:5px}
-.toptab{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;padding:7px 13px;border-radius:20px;font-size:11.8px;font-weight:500;color:var(--ink-2);white-space:nowrap;border:1px solid transparent;transition:.18s var(--ease)}
-.toptab .ti{font-size:12px;opacity:.85}
-.toptab:hover{background:var(--surface-2);color:var(--ink)}
-.toptab.on{background:var(--gold-soft);color:var(--gold-2);border-color:var(--glass-brd)}
 .pagebar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;font-size:11.5px;color:var(--muted)}
 .pagebar .pg-btn{padding:5px 9px;border-radius:7px;border:1px solid var(--hair);background:var(--surface-2)}
 .searchbox{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--hair);border-radius:9px;padding:6px 10px;font-size:12px;min-width:180px}
@@ -305,8 +299,6 @@ select.inp:focus,input.inp:focus{border-color:var(--gold)}
       </div>
       <button class="iconbtn" id="themeBtn" title="Toggle theme">☾</button>
     </header>
-
-    <nav class="topTabs" id="topTabsEl"></nav>
 
     <main id="mainEl">
       <!-- pages injected by JS PAGE_RENDERERS.* functions -->
@@ -1471,12 +1463,6 @@ function renderNav(){
   $('#navList').innerHTML = NAV_ITEMS.map((it,i)=>`<div class="navitem ${it.id===STATE.currentPage?'on':''}" data-nav="${it.id}">
     <span class="ni">${it.icon}</span><span class="nlbl">${esc(it.label)}</span><span class="nno">${(i+1).toString().padStart(2,'0')}</span></div>`).join('');
   $$('.navitem').forEach(el=> el.addEventListener('click', ()=>{ location.hash = '#'+el.dataset.nav; }));
-  renderTopTabs();
-}
-function renderTopTabs(){
-  const el = $('#topTabsEl'); if(!el) return;
-  el.innerHTML = NAV_ITEMS.map(it=>`<button class="toptab ${it.id===STATE.currentPage?'on':''}" data-nav="${it.id}"><span class="ti">${it.icon}</span>${esc(it.label)}</button>`).join('');
-  $$('.toptab', el).forEach(b=> b.addEventListener('click', ()=>{ location.hash = '#'+b.dataset.nav; }));
 }
 function renderActivePage(){
   const id = STATE.currentPage;
@@ -1490,7 +1476,6 @@ function renderActivePage(){
   if(fn){ try{ target.innerHTML = fn(); wirePageExtras(id); } catch(err){ console.error(err); target.innerHTML = `<div class="card"><b>Render error on this page.</b><div class="hint">${esc(err.message)}</div></div>`; } }
   else target.innerHTML = `<div class="card empty-note">Page not yet built.</div>`;
   $$('.navitem').forEach(el=> el.classList.toggle('on', el.dataset.nav===id));
-  $$('.toptab').forEach(el=> el.classList.toggle('on', el.dataset.nav===id));
 }
 function wirePageExtras(id){
   // sortable tables
