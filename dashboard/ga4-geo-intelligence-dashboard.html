@@ -2188,6 +2188,82 @@ function mergeCaratlane(pincode){
   };
 }
 
+/* AI Store-Opening Insight — turns fields that already exist on an `enriched` pincode row
+   (real Zoho deals/won, GA4-modelled sessions/pdp/users/atc/chk, ERP-modelled orders, merged
+   CaratLane presence, and the city's real GA4 session growthPct) into a plain-English retail
+   analyst write-up. No new metric, score or formula is computed here beyond simple ratios for
+   narrative color (e.g. checkout÷ATC) — the FINAL recommendation is a transparent, ordered
+   if-chain over already-existing fields, not a hidden weighted score. Anything with no
+   connected source (nearby Lucira store distance — no store-location master exists anywhere
+   in this project) is stated as "Data unavailable", never estimated. */
+function aiStoreOpeningInsight(c){
+  const cityObj = c.cityObj, cl = c.caratlane;
+  const cityState = esc(c.city||'—') + (c.state && c.state!=='—' ? ', '+esc(c.state) : '');
+  const sessionsTxt = c.sessions!=null ? '~'+fmtInt(c.sessions) : null;
+  const usersTxt = c.users!=null ? '~'+fmtInt(c.users) : null;
+  const ordersTxt = c.orders!=null ? fmtInt(c.orders) : '0';
+  const hasStore = cl.available;
+  const heavyCaratlane = hasStore && cl.storeCount>=3;
+  const checkoutLeak = c.atc>50 && c.chk!=null && safeDiv(c.chk,c.atc) < 0.15;
+  const demandFulfilGap = c.sessions!=null && c.sessions>0 && (c.orders==null || c.orders < c.sessions*0.01);
+  const declining = cityObj && cityObj.growthPct!=null && cityObj.growthPct < -10;
+
+  let growthLine;
+  if (cityObj && cityObj.growthPct!=null){
+    if (cityObj.growthPct > 5) growthLine = `${esc(c.city)} — the city this pin code sits in — is <b>growing</b>: sessions are up ${pct1(cityObj.growthPct)} vs. the prior 90-day period.`;
+    else if (cityObj.growthPct < -5) growthLine = `${esc(c.city)} is <b>declining</b>: sessions are down ${pct1(Math.abs(cityObj.growthPct))} vs. the prior 90-day period.`;
+    else growthLine = `${esc(c.city)}'s session trend is roughly flat (${pct1(cityObj.growthPct)}) vs. the prior 90-day period.`;
+  } else {
+    growthLine = 'Growth trend: Data unavailable (not enough prior-period session history for this city yet).';
+  }
+  const nearbyStoreLine = 'Nearby existing Lucira store: Data unavailable — no store-location master (a list of Lucira\'s own store addresses/coordinates) is connected to any source in this dashboard, so cannibalisation risk from an existing store nearby cannot be checked from this data.';
+  const caratlaneLine = hasStore
+    ? `CaratLane already operates <b>${cl.storeCount}</b> store(s) here${cl.status?` (status: ${esc(cl.status)})`:''}${cl.rating!=null?`, rated ${fmtNum(cl.rating,1)}/5`:''}${cl.catalogTotal?`, with a public catalog of ~${fmtInt(cl.catalogTotal)} listed items`:''} — this pin code is <b>contested</b>, not open ground.`
+    : `No CaratLane store was found at this exact pin code in either capture we have — a possible <b>whitespace</b> opportunity, though that is not proof of zero competitor presence; verify on the ground.`;
+
+  let rec, recClass;
+  if (declining || (heavyCaratlane && c.deals<10)) { rec='Low-priority location'; recClass='crit'; }
+  else if (checkoutLeak && c.deals<10) { rec='Demand exists but conversion is weak'; recClass='warn'; }
+  else if (c.deals>=10 && demandFulfilGap && !heavyCaratlane) { rec='Strong location — consider opening'; recClass='good'; }
+  else if (c.deals>=5) { rec='Promising — validate with marketing/store-visit activity first'; recClass='warn'; }
+  else { rec='Not enough evidence to open'; recClass=''; }
+
+  const narrative = `Pin code ${esc(c.pincode)} (${cityState}) looks like a ${rec.startsWith('Strong')||rec.startsWith('Promising')?'notable':'mixed'} store-opening signal: it has generated <b>${fmtInt(c.deals)} real CRM deals</b> (${fmtInt(c.won)} won) with zero Lucira store nearby${sessionsTxt?`, alongside ${sessionsTxt} modelled sessions and ${usersTxt} distinct users allocated to it from ${esc(c.city)}'s real GA4 activity`:''} — demand exists, but only <b>${ordersTxt}</b> modelled orders have been fulfilled from here so far, and ${hasStore?'a competitor is already on the ground':'no competitor has been confirmed on the ground'}.`;
+
+  const why = `Real deal creation (${fmtInt(c.deals)}, ${fmtInt(c.won)} won) plus modelled digital interest${sessionsTxt?` (${sessionsTxt} sessions / ${usersTxt} users)`:''} together show this is not a cold pin code — people here are already engaging with Lucira online and by deal, without a store to walk into. ${growthLine} ${caratlaneLine}`;
+
+  const opportunity = `The gap between demand and fulfilment is the opportunity: ${sessionsTxt?`~${fmtInt(c.sessions)} modelled sessions produced only ${ordersTxt} modelled completed orders`:`real deal activity (${fmtInt(c.deals)}) has produced only ${ordersTxt} modelled completed orders`} — a physical presence (store or pop-up) closes the last-mile gap that a website alone hasn't.`;
+
+  const action = `Run a pin-code-targeted local campaign — geo-fenced ads plus outreach (call/WhatsApp/SMS) to the ${fmtInt(c.deals)} existing CRM contacts here — inviting them into the nearest current Lucira store or a temporary pop-up, to prove digital demand converts to a physical visit before committing capital to a permanent store.${checkoutLeak?' Checkout*/ATC* conversion is unusually low here too, so also review the online checkout experience (payment options, delivery promise) for this region — part of the gap may be a website friction issue, not a store-need issue.':''}`;
+
+  const plan1 = `Validate demand: 30-day local geo-targeted campaign + direct outreach to the ${fmtInt(c.deals)} existing CRM leads in this pin code; track store-visit/pop-up footfall as the primary metric, not sessions.`;
+  const plan2 = `If footfall is positive, finalize a location and soft-launch with an offer targeted at this same pin code's existing lead list; track walk-ins and walk-in-to-sale conversion.`;
+  const plan3 = `Push toward profitability: convert Month 1-2 walk-ins into repeat visits with a loyalty/referral offer, and reassess CaratLane's local response (pricing/promotions) before scaling further.`;
+
+  const riskParts = [];
+  if (declining) riskParts.push(`${esc(c.city)}'s underlying session trend is declining — opening now risks entering a shrinking market.`);
+  if (heavyCaratlane) riskParts.push(`CaratLane already runs ${cl.storeCount} store(s) here${cl.rating!=null?` (avg rating ${fmtNum(cl.rating,1)}/5)`:''} — this is a contested market, not whitespace.`);
+  if (c.deals<10) riskParts.push(`Real deal volume (${fmtInt(c.deals)}) is still a small sample — the modelled Sessions/Users/ATC/Checkout numbers derived from it are directional, not precise.`);
+  riskParts.push(nearbyStoreLine);
+  const risk = riskParts.join(' ');
+
+  return `
+  <div class="insight" style="margin-top:10px"><span class="ii">✦</span><div>
+    <div style="font-weight:700;margin-bottom:4px">📍 ${esc(c.pincode)} — ${cityState}</div>
+    <div style="margin-bottom:8px">${narrative}</div>
+    <div style="margin-top:6px"><b style="color:var(--gold-2)">WHY:</b> ${why}</div>
+    <div style="margin-top:6px"><b style="color:var(--gold-2)">OPPORTUNITY:</b> ${opportunity}</div>
+    <div style="margin-top:6px"><b style="color:var(--gold-2)">ACTION:</b> ${action}</div>
+    <div style="margin-top:6px"><b style="color:var(--gold-2)">3-MONTH PLAN:</b>
+      <div style="margin-top:2px">Month 1 — ${plan1}</div>
+      <div style="margin-top:2px">Month 2 — ${plan2}</div>
+      <div style="margin-top:2px">Month 3 — ${plan3}</div>
+    </div>
+    <div style="margin-top:6px"><b style="color:var(--gold-2)">RISK:</b> ${risk}</div>
+    <div style="margin-top:8px"><b style="color:var(--gold-2)">FINAL AI RECOMMENDATION:</b> <span class="chip ${recClass}">${esc(rec)}</span></div>
+  </div></div>`;
+}
+
 PAGE_RENDERERS.pincode = function(){
   const rows = filteredZohoPincode().slice().sort(byDesc(r=>r.deals));
   const cov = STATE.D.coverage;
@@ -2216,7 +2292,7 @@ PAGE_RENDERERS.pincode = function(){
     const chk = cityObj ? share*cityObj.begin_checkout : null;
     const orders = erp ? share*erp.orders : null;
     const caratlane = mergeCaratlane(r.pincode);
-    return {...r, cityNorm, share, sessions, pdp, users, atc, chk, orders, caratlane};
+    return {...r, cityNorm, share, sessions, pdp, users, atc, chk, orders, caratlane, cityObj, erp};
   });
 
   const pinsWithCaratlane = enriched.filter(r=>r.caratlane.available).length;
@@ -2261,9 +2337,7 @@ PAGE_RENDERERS.pincode = function(){
   <div class="card" style="margin-bottom:14px">
     <h3 style="font-size:13.5px;margin-bottom:6px">✦ Key Insights</h3>
     ${insightBox(`<b>Pin code capture gap</b>: only <b>${cov.deals_with_zip_pct}%</b> of all Zoho deals (${fmtInt(cov.deals_with_zip)} of ${fmtInt(cov.deals_total)}) have Address_Zip filled in — the other <b>${fmtInt(cov.deals_without_zip)}</b> deals are invisible to this entire page. Getting sales to capture pin code at deal creation is the single biggest unlock for everything below.`)}
-    ${rows[0] ? insightBox(`<b>Top pin code by real deals</b>: <b>${esc(rows[0].pincode)}</b> (${esc(rows[0].city||'—')}) with <b>${fmtInt(rows[0].deals)}</b> deals, ${fmtInt(rows[0].won)} won.`) : ''}
     ${insightBox(`<b>CaratLane overlap</b>: CaratLane already has a store in <b>${pct1(safeDiv(pinsWithCaratlane,rows.length)*100)}</b> of tracked pin codes (${fmtInt(pinsWithCaratlane)} of ${fmtInt(rows.length)}) — plus <b>${fmtInt(storeOnlyRows.length)}</b> pin codes where CaratLane has a store but Lucira has zero deals yet (see Store-Only Pincodes).`)}
-    ${candidates[0] ? insightBox(`<b>Best store-opening signal</b>: pin code <b>${esc(candidates[0].pincode)}</b> (${esc(candidates[0].city||'—')}) — ~${fmtInt(candidates[0].sessions)} modelled sessions and ${fmtInt(candidates[0].deals)} real deals, but only ~${candidates[0].orders!=null?fmtInt(candidates[0].orders):0} modelled orders fulfilled so far.`) : insightBox('No pin code currently has enough real deal volume (5+) to surface a store-opening signal.')}
   </div>
 
   <div class="grid kpi-grid" style="margin-bottom:4px">
@@ -2310,16 +2384,9 @@ PAGE_RENDERERS.pincode = function(){
     hint:'Area = the locality/post-office name(s) served by that pin code, resolved from the public India Post pincode directory (api.postalpincode.in) — real reference data, not modelled from Lucira\'s own sources (no Pin→Area field exists in Zoho or GA4). Pin codes covering many post offices show the first few + a "+N more" count rather than picking one arbitrarily; "—" means the directory had no record for that (or a malformed) pin code. Modelled columns assume a pin code\'s share of its city\'s real GA4/ERP activity equals its share of real Zoho deals within that city — a reasonable proxy, not a measurement. Pin codes with very few deals (1-2) produce noisy modelled numbers; treat those directionally only, and lean on the Deals Created column (real) for anything decision-critical. <b>CaratLane columns are MERGED from two separate captures</b>: an older 206-store online-catalog dataset (gives Total Catalog Items† + the per-category/per-price-band CL…† columns — public assortment-depth proxy, not stock) and a newer 308-pincode Google-Business-Profile store directory (gives Business Status/Rating, and contributes extra names to CaratLane Store(s)). <b>CaratLane Present</b> is TRUE if EITHER capture has a match at that exact pincode; <b>CaratLane Store(s)</b> is the union of store names from both. Business Status/Rating are blank where only the older capture has a match (it never collected those fields), and Total Catalog Items†/CL…† columns are blank where only the newer capture has a match (it never collected catalog counts) — nothing is invented to fill either gap. Click column headers to sort — e.g. sort by real Deals Created descending, then scan the CaratLane columns, to spot high-demand pin codes CaratLane has not yet reached.'})}
 
   <div class="card" style="margin-top:16px">
-    <h3 style="font-size:14px;margin-bottom:10px">✦ Store-Opening Candidates — Pin Code Level</h3>
-    <div class="hint" style="margin-bottom:10px">Ranked by modelled demand (sessions/users) relative to modelled order fulfilment already happening there — i.e. pin codes with real buying intent (deals) and strong modelled traffic, but comparatively little modelled order fulfilment yet. <b>CaratLane presence below is the merged view</b> (real, exact pin-code match against either of the two captures — see Pin Code Detail hint for the full breakdown). This covers CaratLane only, not other competitors, and "no CaratLane found" is not proof of zero presence — a manual on-ground survey of the pin code is still recommended before committing capital. Area/locality name below comes from the public India Post pincode directory, not from Lucira's own data.</div>
-    ${candidates.length ? candidates.map((c,i)=>`
-      <div class="insight" style="margin-top:${i?10:0}px"><span class="ii">✦</span><div>
-        <b>If Lucira opens a store near pin code ${esc(c.pincode)}</b> (${esc(c.city)}${c.state?', '+esc(c.state):''}) — modelled demand is ~${fmtInt(c.sessions)} sessions / ~${fmtInt(c.users)} distinct users from this pin code, with <b>${fmtInt(c.deals)} real CRM deals</b> already logged (${fmtInt(c.won)} won) and only ~${c.orders!=null?fmtInt(c.orders):'0'} modelled completed orders captured so far — a gap between demand and fulfilment worth investigating.
-        <div style="margin-top:4px;color:var(--gold-2)">Area: ${c.area?esc(c.area):'not available (no India Post record for this pin code)'}.</div>
-        <div style="margin-top:4px">${c.caratlane.available
-          ? `<span class="chip good">● CaratLane here (${c.caratlane.storeCount})</span> — ${esc(c.caratlane.storeNames.join(', '))}${c.caratlane.catalogTotal?` (~${fmtInt(c.caratlane.catalogTotal)} catalog items)`:''} — this pin code is <b>contested</b>, not whitespace.`
-          : `<span class="chip">— No CaratLane found</span> in either capture at this exact pin code — a possible <b>whitespace</b> opportunity, but not confirmed absence; verify on the ground.`}</div>
-      </div></div>`).join('') : '<div class="empty-note">No pin code currently has enough real deal volume (5+) to rank a store-opening candidate confidently.</div>'}
+    <h3 style="font-size:14px;margin-bottom:10px">🤖 AI Store-Opening Insights — Pin Code Level</h3>
+    <div class="hint" style="margin-bottom:10px">For each pin code with enough real deal signal (5+ Zoho deals), the AI below connects real deals/won, GA4-modelled Sessions/PDP/Users/ATC/Checkout, ERP-modelled Orders, the city's real GA4 growth trend and merged CaratLane presence into a plain-English read — not a repeat of the numbers already in the table above. The FINAL AI RECOMMENDATION is a transparent rule over these same fields (shown in WHY/RISK), not a hidden score. Anything with no connected source in this dashboard (e.g. distance to an existing Lucira store) is marked "Data unavailable", never estimated.</div>
+    ${candidates.length ? candidates.map(c=>aiStoreOpeningInsight(c)).join('') : '<div class="empty-note">No pin code currently has enough real deal volume (5+) to generate a store-opening insight confidently.</div>'}
   </div>
   `;
 };
