@@ -2261,6 +2261,8 @@ PAGE_RENDERERS.pincode = function(){
   <div class="grid kpi-grid" style="margin-bottom:4px">
     ${kpiCardText('Pin Codes Tracked', fmtInt(rows.length), 'real, from Zoho Address_Zip')}
     ${kpiCard({label:'Deals Created', value:sumBy(rows,r=>r.deals), fmt:fmtInt})}
+    ${kpiCardText('All Zoho Deals — With Pin Code', fmtInt(cov.deals_with_zip)+' of '+fmtInt(cov.deals_total)+' ('+cov.deals_with_zip_pct+'%)', 'full connected window '+cov.min_date+' → '+cov.max_date+' — real, not date-filtered')}
+    ${kpiCardText('All Zoho Deals — Without Pin Code', fmtInt(cov.deals_without_zip)+' of '+fmtInt(cov.deals_total)+' ('+fmtNum(100-cov.deals_with_zip_pct,1)+'%)', 'sales team left Address_Zip blank — this is why Deals Created above looks low vs. Zoho\'s real daily deal volume')}
     ${kpiCard({label:'Modelled Sessions (sum)', value:sumBy(enriched,r=>r.sessions||0), fmt:fmtInt})}
     ${kpiCard({label:'Modelled Users (sum)', value:sumBy(enriched,r=>r.users||0), fmt:fmtInt})}
     ${kpiCard({label:'Modelled PDP Views (sum)', value:sumBy(enriched,r=>r.pdp||0), fmt:fmtInt})}
