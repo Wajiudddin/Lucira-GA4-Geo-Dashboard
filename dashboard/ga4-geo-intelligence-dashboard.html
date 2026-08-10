@@ -2234,6 +2234,10 @@ function aiStoreOpeningInsight(c){
 
   const opportunity = `The gap between demand and fulfilment is the opportunity: ${sessionsTxt?`~${fmtInt(c.sessions)} modelled sessions produced only ${ordersTxt} modelled completed orders`:`real deal activity (${fmtInt(c.deals)}) has produced only ${ordersTxt} modelled completed orders`} — a physical presence (store or pop-up) closes the last-mile gap that a website alone hasn't.`;
 
+  const benefit = `Opening here converts demand that already exists into revenue, rather than generating new demand from scratch: ${fmtInt(c.deals)} CRM deals (${fmtInt(c.won)} won)${sessionsTxt?` and ${sessionsTxt} modelled sessions`:''} from this exact pin code currently have nowhere local to convert into a walk-in sale — for jewellery, a considered, try-before-you-buy purchase, a nearby store typically converts a meaningfully higher share of that existing interest than the website alone. ${hasStore
+    ? `It also means Lucira would be competing for a market CaratLane has already proven out here (${cl.storeCount} store${cl.storeCount>1?'s':''}${cl.rating!=null?`, rated ${fmtNum(cl.rating,1)}/5`:''}${cl.catalogTotal?`, ~${fmtInt(cl.catalogTotal)} catalog items`:''}) instead of ceding that proven demand to them by default.`
+    : `Because no CaratLane presence was found at this exact pin code, Lucira would also be first to market here rather than following a competitor in.`}`;
+
   const action = `Run a pin-code-targeted local campaign — geo-fenced ads plus outreach (call/WhatsApp/SMS) to the ${fmtInt(c.deals)} existing CRM contacts here — inviting them into the nearest current Lucira store or a temporary pop-up, to prove digital demand converts to a physical visit before committing capital to a permanent store.${checkoutLeak?' Checkout*/ATC* conversion is unusually low here too, so also review the online checkout experience (payment options, delivery promise) for this region — part of the gap may be a website friction issue, not a store-need issue.':''}`;
 
   const plan1 = `Validate demand: 30-day local geo-targeted campaign + direct outreach to the ${fmtInt(c.deals)} existing CRM leads in this pin code; track store-visit/pop-up footfall as the primary metric, not sessions.`;
@@ -2253,6 +2257,7 @@ function aiStoreOpeningInsight(c){
     <div style="margin-bottom:8px">${narrative}</div>
     <div style="margin-top:6px"><b style="color:var(--gold-2)">WHY:</b> ${why}</div>
     <div style="margin-top:6px"><b style="color:var(--gold-2)">OPPORTUNITY:</b> ${opportunity}</div>
+    <div style="margin-top:6px"><b style="color:var(--gold-2)">BENEFIT:</b> ${benefit}</div>
     <div style="margin-top:6px"><b style="color:var(--gold-2)">ACTION:</b> ${action}</div>
     <div style="margin-top:6px"><b style="color:var(--gold-2)">3-MONTH PLAN:</b>
       <div style="margin-top:2px">Month 1 — ${plan1}</div>
