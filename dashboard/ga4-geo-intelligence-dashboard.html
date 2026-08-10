@@ -317,6 +317,7 @@ select.inp:focus,input.inp:focus{border-color:var(--gold)}
       <section class="page" id="pg-cityoverview"></section>
       <section class="page" id="pg-cityperf"></section>
       <section class="page" id="pg-pincode"></section>
+      <section class="page" id="pg-caratlane"></section>
       <section class="page" id="pg-area"></section>
       <section class="page" id="pg-salesorders"></section>
       <section class="page" id="pg-sessionanalysis"></section>
@@ -369,6 +370,7 @@ select.inp:focus,input.inp:focus{border-color:var(--gold)}
 /* ============================== 1. NAV ============================== */
 const NAV_ITEMS = [
   {id:'pincode',         icon:'▦', label:'Pin Code Intelligence'},
+  {id:'caratlane',       icon:'◈', label:'CaratLane Info'},
   {id:'exec',            icon:'◆', label:'Executive Summary'},
   {id:'cityoverview',    icon:'⬢', label:'City Overview & Map'},
   {id:'cityperf',        icon:'▲', label:'City Performance'},
@@ -396,6 +398,7 @@ const PAGE_META = {
   cityoverview:{t:'City Overview & Map', s:'Every city, one leaderboard + geo map'},
   cityperf:{t:'City Performance', s:'Rankings · heatmaps · correlations'},
   pincode:{t:'Pin Code Intelligence', s:'Real deals + modelled demand, pin-code by pin-code — store-opening candidates'},
+  caratlane:{t:'CaratLane Info', s:"Competitor's public store footprint & catalog mix"},
   area:{t:'Area Performance', s:'No Area / locality field or Pin→Area master exists in any connected source'},
   salesorders:{t:'Sales & Orders (ERP)', s:'Real completed-order revenue by customer city'},
   sessionanalysis:{t:'Session Analysis', s:'Source · Medium · Campaign · Landing Page — real session-grain'},
@@ -425,6 +428,7 @@ const DATE_SCOPE = {
   roi:            {mode:'full',  note:'Full connected window — built from the same non-daily campaign data as Campaign Performance.'},
   sessionanalysis:{mode:'full',  note:'Full connected window — session-analysis rows are not broken down by day in the source query.'},
   salesorders:    {mode:'full',  note:'Full ERP snapshot — this section has its own independent data window, separate from the GA4 date filter above.'},
+  caratlane:      {mode:'full',  note:'One-time public data capture (Aug 2026) — has no date dimension at all, independent of the date filter above.'},
   today:          {mode:'fixed', note:"Always the most recent GA4 day available — doesn't change with the date filter above."},
   docs:           {mode:'na'}, dictionary:{mode:'na'}, chat:{mode:'na'},
   area:           {mode:'na'}, identified:{mode:'na'}, journey:{mode:'na'}, attribution:{mode:'na'}, webengage:{mode:'na'},
@@ -2240,6 +2244,66 @@ PAGE_RENDERERS.pincode = function(){
           : `<span class="chip">— No CaratLane found</span> in our captured 112 stores at this exact pin code — a possible <b>whitespace</b> opportunity, but not confirmed absence; verify on the ground.`}</div>
       </div></div>`).join('') : '<div class="empty-note">No pin code currently has enough real deal volume (5+) to rank a store-opening candidate confidently.</div>'}
   </div>
+  `;
+};
+
+/* ============================== 26a2. PAGE — CARATLANE INTELLIGENCE ============================== */
+/* Merged in from the standalone dashboard/caratlane-intelligence.html (2026-08-10) -- same
+   underlying data (GEO_INTEL_DATA.caratlaneStores, already embedded, no new fetch/script),
+   rebuilt with THIS app's own kpiCardText/barChart/simpleTable primitives instead of
+   duplicating caratlane_intel.js's bespoke vanilla renderer, so it reads as one dashboard.
+   The standalone file is left on disk (not deleted) in case it's still linked anywhere. */
+const CARATLANE_CATEGORY_KEYS = ['Rings','Earrings','Necklaces','Pendants','Bracelets','Bangles','Nose pin'];
+const CARATLANE_PRICE_BANDS = [
+  {key:'u5k', label:'Under ₹5,000'}, {key:'b5_10', label:'₹5,001–₹10,000'}, {key:'b10_15', label:'₹10,001–₹15,000'},
+  {key:'b15_20', label:'₹15,001–₹20,000'}, {key:'b20_30', label:'₹20,001–₹30,000'}, {key:'b30_40', label:'₹30,001–₹40,000'},
+];
+PAGE_RENDERERS.caratlane = function(){
+  const stores = (STATE.D.RAW.caratlaneStores||[]).map(s=>{
+    const total = CARATLANE_CATEGORY_KEYS.reduce((a,k)=>a+((s.cat&&s.cat[k])||0),0);
+    return {...s, total};
+  });
+  const cities = new Set(stores.map(s=>s.city)).size;
+  const totalItems = sumBy(stores, s=>s.total);
+
+  const catAgg = CARATLANE_CATEGORY_KEYS.map(k=>({label:k, value:sumBy(stores, s=>(s.cat&&s.cat[k])||0)})).filter(r=>r.value>0).sort(byDesc(r=>r.value));
+  const pbAgg = CARATLANE_PRICE_BANDS.map(b=>({label:b.label, value:sumBy(stores, s=>(s.pb&&s.pb[b.key])||0)})).filter(r=>r.value>0);
+  const cityAgg = Array.from(groupBy(stores, s=>s.city).entries())
+    .map(([city,rows])=>({label:`${city} (${rows.length})`, value:sumBy(rows,s=>s.total)}))
+    .sort(byDesc(r=>r.value)).slice(0,20);
+
+  return `
+  ${renderChipsRow()}
+  <div class="sec-head"><div><h2>CaratLane Intelligence</h2><p>Competitor's public store footprint and online-catalog assortment mix, for benchmarking against Lucira's own network.</p></div></div>
+
+  <div class="hint" style="margin-bottom:14px">⚠ <b>Read this before using the numbers.</b> CaratLane does not publish real per-store physical stock anywhere public — no retailer does. The "inventory" figures here are <b>online catalog listing counts</b> pulled from each store's own filter sidebar on caratlane.com (a public proxy for local assortment depth/mix), <b>not</b> audited warehouse or shelf stock. Every store page also lists more categories/price bands than captured — figures below are a floor, not the full catalog. Coverage is ${fmtInt(stores.length)} of an estimated ~230+ stores nationwide (7 metros alone list 148 on CaratLane's own city pages). "Diamond/Gold/Gemstone/Platinum" are material filters, not product categories, and are kept out of the totals to avoid double-counting. Collected via public web search + read of each store's own catalog page (no login, no ToS bypass) — not affiliated with or endorsed by CaratLane/Tata/Titan; for internal benchmarking only. This dataset is a one-time capture (Aug 2026), independent of the date filter above.</div>
+
+  <div class="grid g4" style="margin-bottom:14px">
+    ${kpiCardText('Stores Captured', fmtInt(stores.length), `across ${fmtInt(cities)} cities`)}
+    ${kpiCardText('Cities Covered', fmtInt(cities), 'metro + tier-2/3 towns')}
+    ${kpiCardText('Catalog Items Indexed', fmtInt(totalItems), 'across all product categories — a floor, not the full catalog')}
+    ${kpiCardText('Avg Items / Store', fmtInt(safeDiv(totalItems,stores.length)), 'across captured categories')}
+  </div>
+
+  <div class="grid g2" style="margin-bottom:14px">
+    <div class="card chart-card"><div class="hd"><h3>Category Mix — catalog listings ${chartInfo('Category Mix','Sum of catalog listing counts per product category, across all captured stores.','SUM(cat[category]) across stores','Shows where CaratLane concentrates online assortment depth.','A category far ahead of the rest is where CaratLane is deepest — check Lucira\'s own depth there.','Benchmark Lucira\'s category assortment against the leader(s) here.','','category mix','Merchandising','One-time (Aug 2026)')}</h3></div>${barChart(catAgg,{horizontal:true})}</div>
+    <div class="card chart-card"><div class="hd"><h3>Price-Band Mix — catalog listings</h3></div>${barChart(pbAgg,{horizontal:true})}
+      <div class="hint" style="margin-top:8px">Bands beyond ₹30,000–40,000 exist on every store page but weren't reliably captured in this pass.</div>
+    </div>
+  </div>
+
+  <div class="card chart-card" style="margin-bottom:14px"><div class="hd"><h3>By City — total catalog items (store count)</h3></div>${barChart(cityAgg,{horizontal:true,height:Math.max(220,cityAgg.length*26)})}</div>
+
+  ${simpleTable('caratlaneTbl',
+    ['Pincode','Store','City','Total','Address'].concat(CARATLANE_CATEGORY_KEYS.map(k=>'CL '+k)).concat(CARATLANE_PRICE_BANDS.map(b=>b.label)).concat(['Source']),
+    stores.slice().sort(byDesc(s=>s.total)).map(s=>[
+      esc(s.pincode||'—'), esc(s.store), esc(s.city), [fmtInt(s.total), s.total], esc(s.address||''),
+      ...CARATLANE_CATEGORY_KEYS.map(k=> (s.cat&&s.cat[k]) ? [fmtInt(s.cat[k]), s.cat[k]] : '—'),
+      ...CARATLANE_PRICE_BANDS.map(b=> (s.pb&&s.pb[b.key]) ? [fmtInt(s.pb[b.key]), s.pb[b.key]] : '—'),
+      `<a href="${esc(s.url)}" target="_blank" rel="noopener" style="color:var(--gold-2)">view ↗</a>`,
+    ]),
+    {title:`Every CaratLane Store (${stores.length})`, searchable:true, hint:'Click a column header to sort. "CL" columns are CaratLane\'s own catalog-listing counts per category/price-band.'}
+  )}
   `;
 };
 
