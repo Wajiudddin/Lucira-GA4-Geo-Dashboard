@@ -2173,6 +2173,33 @@ const CARATLANE_MASTER_BY_PINCODE = (() => {
 })();
 function caratlaneMasterAt(pincode){ const key = normPincode(pincode); return key ? (CARATLANE_MASTER_BY_PINCODE.get(key)||null) : null; }
 
+/* ---- MERGED CaratLane view (2026-08-10, user: "merge both table … overall caratlane
+   pincode wise data") — combines the two separate captures (old catalog-listing dataset +
+   new GBP store-master) into ONE result per pincode instead of two parallel column groups.
+   Store presence/name is the UNION of both sources (a pincode counts as "present" if EITHER
+   has it); catalog counts (cat/pb/total) only exist in the old dataset; status/rating only
+   exist in the new master — each field is simply absent (not guessed) where its source
+   doesn't cover that pincode. */
+function mergeCaratlane(pincode){
+  const oldStores = caratlaneAt(pincode);
+  const master = caratlaneMasterAt(pincode);
+  const names = new Set();
+  oldStores.forEach(s=>{ if(s.store) names.add(s.store); });
+  if(master) master.stores.forEach(s=>{ if(s.name) names.add(s.name); });
+  const cat = {}; CARATLANE_CAT_KEYS.forEach(k=>{ cat[k] = oldStores.reduce((a,s)=>a+((s.cat&&s.cat[k])||0),0); });
+  const pb = {}; CARATLANE_PB_BANDS.forEach(b=>{ pb[b.key] = oldStores.reduce((a,s)=>a+((s.pb&&s.pb[b.key])||0),0); });
+  const statuses = master ? Array.from(new Set(master.stores.map(s=>s.status).filter(Boolean))) : [];
+  const ratings = master ? master.stores.map(s=>s.rating).filter(v=>v!=null) : [];
+  return {
+    available: names.size>0,
+    storeNames: Array.from(names), storeCount: names.size,
+    status: statuses.length ? statuses.join(', ') : null,
+    rating: ratings.length ? ratings.reduce((a,b)=>a+b,0)/ratings.length : null,
+    catalogTotal: oldStores.reduce((a,s)=>a+s.total,0), cat, pb,
+    city: (master && master.city) || (oldStores[0] && oldStores[0].city) || null,
+  };
+}
+
 PAGE_RENDERERS.pincode = function(){
   const rows = filteredZohoPincode().slice().sort(byDesc(r=>r.deals));
   const cov = STATE.D.coverage;
@@ -2200,49 +2227,47 @@ PAGE_RENDERERS.pincode = function(){
     const atc = cityObj ? share*cityObj.add_to_cart : null;
     const chk = cityObj ? share*cityObj.begin_checkout : null;
     const orders = erp ? share*erp.orders : null;
-    const cl = caratlaneAt(r.pincode);
-    const clTotal = cl.reduce((a,s)=>a+s.total,0);
-    const clCat = {}; CARATLANE_CAT_KEYS.forEach(k=>{ clCat[k] = cl.reduce((a,s)=>a+((s.cat&&s.cat[k])||0),0); });
-    const clPb = {}; CARATLANE_PB_BANDS.forEach(b=>{ clPb[b.key] = cl.reduce((a,s)=>a+((s.pb&&s.pb[b.key])||0),0); });
-    return {...r, cityNorm, share, sessions, pdp, users, atc, chk, orders, cl, clTotal, clCat, clPb};
+    const caratlane = mergeCaratlane(r.pincode);
+    return {...r, cityNorm, share, sessions, pdp, users, atc, chk, orders, caratlane};
   });
 
-  const pinsWithCaratlane = enriched.filter(r=>r.cl.length>0).length;
+  const pinsWithCaratlane = enriched.filter(r=>r.caratlane.available).length;
 
   // store-opening candidates: enough real deal signal (5+), meaningful modelled demand,
   // but modelled order fulfilment still low relative to that demand — a demand/fulfilment gap.
   const candidates = enriched.filter(r=>r.deals>=5 && r.sessions!=null)
     .sort(byDesc(r=> r.sessions * (1/(1+(r.orders||0))) )).slice(0,5);
 
-  // ---- FULL OUTER JOIN on Pincode (2026-08-10, explicit spec): dashboard/session pincodes
-  // (Zoho, `enriched` above) ∪ CaratLane store-master pincodes (etl/caratlane_store_master.json).
-  // `rows`/`enriched`/`cov`/the KPIs above and `candidates` are DELIBERATELY left untouched —
-  // they stay Zoho-only so "Pin Codes Tracked" etc. keep meaning exactly what their label says.
-  // This join only feeds the Pin Code Detail TABLE, so CaratLane-only pincodes (a store exists,
-  // Lucira has zero deals there) are visible without inflating the real-data summary metrics.
-  const matchedRows = enriched.map(r=>{
-    const storeMaster = caratlaneMasterAt(r.pincode);
-    return {...r, storeMaster, storeAvailable: !!storeMaster};
-  });
-  const matchedPins = new Set(matchedRows.map(r=> normPincode(r.pincode)).filter(Boolean));
-  const storeOnlyRows = (STATE.D.RAW.caratlaneStoreMaster||[])
-    .filter(sm=> !matchedPins.has(normPincode(sm.pincode)))
-    .map(sm=>{
-      const cl = caratlaneAt(sm.pincode); // near-zero overlap expected (different capture, see hint) but check honestly, not assumed
-      const clTotal = cl.reduce((a,s)=>a+s.total,0);
-      const clCat = {}; CARATLANE_CAT_KEYS.forEach(k=>{ clCat[k] = cl.reduce((a,s)=>a+((s.cat&&s.cat[k])||0),0); });
-      const clPb = {}; CARATLANE_PB_BANDS.forEach(b=>{ clPb[b.key] = cl.reduce((a,s)=>a+((s.pb&&s.pb[b.key])||0),0); });
+  // ---- FULL OUTER JOIN on Pincode (2026-08-10 spec, merged 2026-08-10): dashboard/session
+  // pincodes (Zoho, `enriched` above) ∪ EVERY CaratLane pincode from BOTH captures (old
+  // catalog dataset + new GBP store master — not just the new one, so the ~25 pincodes only
+  // in the old dataset aren't silently dropped either). `rows`/`enriched`/`cov`/the KPIs above
+  // and `candidates` are DELIBERATELY left untouched — they stay Zoho-only so "Pin Codes
+  // Tracked" etc. keep meaning exactly what their label says. This join only feeds the Pin
+  // Code Detail TABLE, so CaratLane-only pincodes (a store exists, Lucira has zero deals
+  // there) are visible without inflating the real-data summary metrics.
+  const zohoPins = new Set(enriched.map(r=> normPincode(r.pincode)).filter(Boolean));
+  const allCaratlanePins = new Set();
+  (STATE.D.RAW.caratlaneStores||[]).forEach(s=>{ const k=normPincode(s.pincode); if(k) allCaratlanePins.add(k); });
+  (STATE.D.RAW.caratlaneStoreMaster||[]).forEach(s=>{ const k=normPincode(s.pincode); if(k) allCaratlanePins.add(k); });
+  const storeOnlyRows = Array.from(allCaratlanePins)
+    .filter(k=> !zohoPins.has(k))
+    .map(pin=>{
+      const caratlane = mergeCaratlane(pin);
       return {
-        pincode: sm.pincode, area: null, city: sm.city || '—', state: sm.state || '—',
+        pincode: pin, area: null, city: caratlane.city || '—', state: '—',
         deals: 0, won: 0, share: 0, sessions: null, pdp: null, users: null, atc: null, chk: null, orders: null,
-        cl, clTotal, clCat, clPb, storeMaster: sm, storeAvailable: true, storeOnly: true,
+        caratlane, storeOnly: true,
       };
     });
-  const fullOuterRows = matchedRows.concat(storeOnlyRows).sort(byDesc(r=>r.deals));
+  const fullOuterRows = enriched.concat(storeOnlyRows).sort(byDesc(r=>r.deals));
+
+  const topAtc = enriched.filter(r=>r.atc!=null && r.atc>0).slice().sort(byDesc(r=>r.atc)).slice(0,15).map(r=>({label:r.pincode+' · '+(r.city||'—'), value:r.atc}));
+  const topChk = enriched.filter(r=>r.chk!=null && r.chk>0).slice().sort(byDesc(r=>r.chk)).slice(0,15).map(r=>({label:r.pincode+' · '+(r.city||'—'), value:r.chk}));
 
   return `
   ${renderChipsRow()}
-  <div class="sec-head"><div><h2>Pin Code Intelligence</h2><p>Pin Code, City, State, Deals Created and Closed Won are <b>real</b> (Zoho <code>Address_Zip</code>). Sessions, PDP, Users, ATC and Checkout are <b>modelled</b> — GA4 has no postal dimension at all, so these are allocated from that pin code's city-level GA4 totals <b>for the currently selected date range</b> (city sessions/pdp/etc. are tracked day-by-day, same as the pin code deals), weighted by its share of real deals within the city for that same range (marked * throughout) — narrowing to a single day changes both consistently. <b>Orders*</b> is the one exception: it comes from the ERP feed, which is fetched as a live full snapshot with no date dimension, so it does not shrink with the date filter. Known/Identified Users has no source at ANY grain and is never modelled — shown as N/A, not estimated. <b>CaratLane columns are a real competitive layer</b> — exact pin-code matches against 206 of an estimated 230+ CaratLane stores nationwide (their own public catalog pages, not stock data — see hint below). <b>The table below is a full outer join on Pincode</b> against a separate, richer CaratLane store directory (308 pincodes, Google-Business-Profile data) — every pincode from either side is shown; pincodes with a store but no Lucira deals yet show 0/— for the deal/session columns rather than being hidden.</p></div>
+  <div class="sec-head"><div><h2>Pin Code Intelligence</h2><p>Pin Code, City, State, Deals Created and Closed Won are <b>real</b> (Zoho <code>Address_Zip</code>). Sessions, PDP, Users, ATC and Checkout are <b>modelled</b> — GA4 has no postal dimension at all, so these are allocated from that pin code's city-level GA4 totals <b>for the currently selected date range</b> (city sessions/pdp/etc. are tracked day-by-day, same as the pin code deals), weighted by its share of real deals within the city for that same range (marked * throughout) — narrowing to a single day changes both consistently. <b>Orders*</b> is the one exception: it comes from the ERP feed, which is fetched as a live full snapshot with no date dimension, so it does not shrink with the date filter. Known/Identified Users has no source at ANY grain and is never modelled — shown as N/A, not estimated. <b>The table below is a full outer join on Pincode</b> — every pincode from Zoho deals OR either of the two CaratLane captures (206-store catalog dataset + 308-pincode GBP store master, merged into one CaratLane view) is shown; pincodes with a store but no Lucira deals yet show 0/— for the deal/session columns rather than being hidden.</p></div>
     <span class="chip warn">○ ${fmtInt(rows.length)} pin codes tracked · ${cov.deals_with_city_pct}%-class Zoho coverage</span></div>
 
   <div class="grid kpi-grid" style="margin-bottom:4px">
@@ -2252,15 +2277,20 @@ PAGE_RENDERERS.pincode = function(){
     ${kpiCard({label:'Modelled Sessions (sum)', value:sumBy(enriched,r=>r.sessions||0), fmt:fmtInt})}
     ${kpiCard({label:'Modelled Users (sum)', value:sumBy(enriched,r=>r.users||0), fmt:fmtInt})}
     ${kpiCardText('Known Users', 'N/A', 'No identity key at any grain — see Identified Users page')}
-    ${kpiCardText('CaratLane Here', fmtInt(pinsWithCaratlane)+' of '+fmtInt(rows.length), 'tracked pin codes with a captured CaratLane store — real, exact pin-code match')}
-    ${kpiCardText('CaratLane Store Master', fmtInt(STATE.D.RAW.caratlaneStoreMaster ? STATE.D.RAW.caratlaneStoreMaster.length : 0)+' pincodes', 'separate GBP-derived directory — full outer join, table below')}
+    ${kpiCardText('CaratLane Present', fmtInt(pinsWithCaratlane)+' of '+fmtInt(rows.length), 'tracked pin codes matching EITHER CaratLane capture (merged), real exact pin-code match')}
+    ${kpiCardText('CaratLane Pincodes (merged, both captures)', fmtInt(allCaratlanePins.size), 'union of the 206-store catalog dataset + the 308-pincode GBP store master')}
     ${kpiCardText('Store-Only Pincodes', fmtInt(storeOnlyRows.length), 'a CaratLane store exists here but Lucira has 0 deals — shown, not filtered out')}
   </div>
 
-  ${simpleTable('pincodeTbl', ['#','Pin Code','Area','City','State','Sessions*','PDP*','Users*','Known Users','ATC*','Checkout*','Deals Created','Orders*','Store Available','Store Name(s)','Business Status','Rating','CaratLane Here','CaratLane Store(s)','CaratLane Total Inventory†']
+  <div class="grid g2" style="margin-bottom:14px">
+    <div class="card chart-card"><div class="hd"><h3>Top 15 Pin Codes — Add to Cart* ${chartInfo('Add to Cart by Pin Code','Modelled ATC allocated to each pin code by its share of real deals within its city, for the currently selected date range.','share × city ATC (same allocation as the table\'s ATC* column)','Shows where cart-building intent is concentrated at the pin-code level, not just city level.','A pin code high on ATC but low on Checkout is a conversion-drop-off signal worth investigating.','Cross-check against the Checkout* chart alongside it — a large gap between the two at the same pin code is where the funnel leaks.','','atc','Sales Ops','Daily')}</h3></div>${topAtc.length?barChart(topAtc,{horizontal:true,height:Math.max(220,topAtc.length*26)}):'<div class="empty-note">No pin code has modelled ATC &gt; 0 in the current date range.</div>'}</div>
+    <div class="card chart-card"><div class="hd"><h3>Top 15 Pin Codes — Checkout*</h3></div>${topChk.length?barChart(topChk,{horizontal:true,height:Math.max(220,topChk.length*26)}):'<div class="empty-note">No pin code has modelled Checkout &gt; 0 in the current date range.</div>'}</div>
+  </div>
+
+  ${simpleTable('pincodeTbl', ['#','Pin Code','Area','City','State','Sessions*','PDP*','Users*','Known Users','ATC*','Checkout*','Deals Created','Orders*','CaratLane Present','CaratLane Store(s)','Business Status','Rating','Total Catalog Items†']
       .concat(CARATLANE_CAT_KEYS.map(k=>'CL '+k+'†'))
       .concat(CARATLANE_PB_BANDS.map(b=>'CL '+b.label+'†')),
-    fullOuterRows.map((r,i)=>[
+    fullOuterRows.map((r,i)=>{ const cl = r.caratlane; return [
     [i+1,i+1], esc(r.pincode), esc(r.area||'—'), esc(r.city||'—'), esc(r.state||'—'),
     [r.sessions!=null?fmtInt(r.sessions):'—', r.sessions||0],
     [r.pdp!=null?fmtInt(r.pdp):'—', r.pdp||0],
@@ -2270,28 +2300,26 @@ PAGE_RENDERERS.pincode = function(){
     [r.chk!=null?fmtInt(r.chk):'—', r.chk||0],
     [r.storeOnly?`<span style="color:var(--muted)">0</span>`:fmtInt(r.deals), n(r.deals)],
     [r.orders!=null?fmtInt(r.orders):'—', r.orders||0],
-    [r.storeAvailable?`<span class="chip good">● TRUE</span>`:`<span class="chip">— FALSE</span>`, r.storeAvailable?1:0],
-    r.storeMaster ? esc(r.storeMaster.stores.map(s=>s.name).join('; ')) : '—',
-    r.storeMaster ? esc(Array.from(new Set(r.storeMaster.stores.map(s=>s.status).filter(Boolean))).join(', ')) : '—',
-    r.storeMaster ? (()=>{ const rs=r.storeMaster.stores.map(s=>s.rating).filter(v=>v!=null); return rs.length? [fmtNum(rs.reduce((a,b)=>a+b,0)/rs.length,1), rs.reduce((a,b)=>a+b,0)/rs.length] : '—'; })() : '—',
-    [r.cl.length?`<span class="chip good">● Yes (${r.cl.length})</span>`:`<span class="chip">— No</span>`, r.cl.length],
-    r.cl.length ? esc(r.cl.map(s=>s.store).join('; ')) : '—',
-    [r.clTotal?fmtInt(r.clTotal):'—', r.clTotal||0],
-  ].concat(CARATLANE_CAT_KEYS.map(k=> [r.clCat[k]?fmtInt(r.clCat[k]):'—', r.clCat[k]||0]))
-   .concat(CARATLANE_PB_BANDS.map(b=> [r.clPb[b.key]?fmtInt(r.clPb[b.key]):'—', r.clPb[b.key]||0]))
+    [cl.available?`<span class="chip good">● TRUE</span>`:`<span class="chip">— FALSE</span>`, cl.available?1:0],
+    cl.storeCount ? esc(cl.storeNames.join('; ')) : '—',
+    cl.status ? esc(cl.status) : '—',
+    cl.rating!=null ? [fmtNum(cl.rating,1), cl.rating] : '—',
+    [cl.catalogTotal?fmtInt(cl.catalogTotal):'—', cl.catalogTotal||0],
+  ].concat(CARATLANE_CAT_KEYS.map(k=> [cl.cat[k]?fmtInt(cl.cat[k]):'—', cl.cat[k]||0]))
+   .concat(CARATLANE_PB_BANDS.map(b=> [cl.pb[b.key]?fmtInt(cl.pb[b.key]):'—', cl.pb[b.key]||0])); }
   ), {title:'Pin Code Detail  ·  * = modelled (allocated from real city totals by deal-share, not directly measured)  ·  † = CaratLane public catalog listing count, not stock', searchable:true,
-    hint:'Area = the locality/post-office name(s) served by that pin code, resolved from the public India Post pincode directory (api.postalpincode.in) — real reference data, not modelled from Lucira\'s own sources (no Pin→Area field exists in Zoho or GA4). Pin codes covering many post offices show the first few + a "+N more" count rather than picking one arbitrarily; "—" means the directory had no record for that (or a malformed) pin code. Modelled columns assume a pin code\'s share of its city\'s real GA4/ERP activity equals its share of real Zoho deals within that city — a reasonable proxy, not a measurement. Pin codes with very few deals (1-2) produce noisy modelled numbers; treat those directionally only, and lean on the Deals Created / Closed Won columns (real) for anything decision-critical. <b>Every "CaratLane…†" column</b> (Here / Store(s) / Total Inventory / per-category Rings…Nose pin / per-price-band &lt;₹5k…₹30-40k) comes from the same underlying dataset as the standalone CaratLane Competitive Intelligence dashboard (etl/caratlane_stores.json, embedded into this dashboard\'s own GEO_INTEL_DATA.caratlaneStores) — 206 of an estimated 230+ CaratLane stores nationwide, matched to this row by EXACT pin code string, summed across stores if more than one CaratLane store shares that pin code. "No"/"—" means no CaratLane store was found in our captured 206 at that exact pin code — it is not proof CaratLane has zero presence there (they may have a store we did not capture, or one just outside this pin code in the same locality). Every CaratLane figure is that store\'s own ONLINE CATALOG LISTING count (a public assortment-depth proxy), not audited stock — no retailer publishes real per-store inventory, Lucira included; each store page also lists more categories/bands than captured, so these are a floor. <b>"Store Available" / "Store Name(s)" / "Business Status" / "Rating"</b> come from a SEPARATE, newer CaratLane store directory (308 pincodes, scraped from Google Business Profiles — name/address/phone/rating, not catalog depth) — this is the dataset the table is full-outer-joined against, so a row can have Store Available=TRUE with 0 Deals Created (a store exists, Lucira has no deals there yet) just as easily as the reverse. It is a different capture from the older "CaratLane…†" columns above, so the two do not always agree on which pincodes have a store — both are shown honestly rather than reconciled into one guess. Click column headers to sort — e.g. sort by real Deals Created descending, then scan the CaratLane columns, to spot high-demand pin codes CaratLane has not yet reached.'})}
+    hint:'Area = the locality/post-office name(s) served by that pin code, resolved from the public India Post pincode directory (api.postalpincode.in) — real reference data, not modelled from Lucira\'s own sources (no Pin→Area field exists in Zoho or GA4). Pin codes covering many post offices show the first few + a "+N more" count rather than picking one arbitrarily; "—" means the directory had no record for that (or a malformed) pin code. Modelled columns assume a pin code\'s share of its city\'s real GA4/ERP activity equals its share of real Zoho deals within that city — a reasonable proxy, not a measurement. Pin codes with very few deals (1-2) produce noisy modelled numbers; treat those directionally only, and lean on the Deals Created / Closed Won columns (real) for anything decision-critical. <b>CaratLane columns are MERGED from two separate captures</b>: an older 206-store online-catalog dataset (gives Total Catalog Items† + the per-category/per-price-band CL…† columns — public assortment-depth proxy, not stock) and a newer 308-pincode Google-Business-Profile store directory (gives Business Status/Rating, and contributes extra names to CaratLane Store(s)). <b>CaratLane Present</b> is TRUE if EITHER capture has a match at that exact pincode; <b>CaratLane Store(s)</b> is the union of store names from both. Business Status/Rating are blank where only the older capture has a match (it never collected those fields), and Total Catalog Items†/CL…† columns are blank where only the newer capture has a match (it never collected catalog counts) — nothing is invented to fill either gap. Click column headers to sort — e.g. sort by real Deals Created descending, then scan the CaratLane columns, to spot high-demand pin codes CaratLane has not yet reached.'})}
 
   <div class="card" style="margin-top:16px">
     <h3 style="font-size:14px;margin-bottom:10px">✦ Store-Opening Candidates — Pin Code Level</h3>
-    <div class="hint" style="margin-bottom:10px">Ranked by modelled demand (sessions/users) relative to modelled order fulfilment already happening there — i.e. pin codes with real buying intent (deals) and strong modelled traffic, but comparatively little modelled order fulfilment yet. <b>CaratLane presence below is a real, exact pin-code match against 112 of an estimated 230+ CaratLane stores nationwide</b> (their own public catalog pages — see Pin Code Detail hint for the full caveat). This covers CaratLane only, not other competitors, and "no CaratLane found" is not proof of zero presence — a manual on-ground survey of the pin code is still recommended before committing capital. Area/locality name below comes from the public India Post pincode directory, not from Lucira's own data.</div>
+    <div class="hint" style="margin-bottom:10px">Ranked by modelled demand (sessions/users) relative to modelled order fulfilment already happening there — i.e. pin codes with real buying intent (deals) and strong modelled traffic, but comparatively little modelled order fulfilment yet. <b>CaratLane presence below is the merged view</b> (real, exact pin-code match against either of the two captures — see Pin Code Detail hint for the full breakdown). This covers CaratLane only, not other competitors, and "no CaratLane found" is not proof of zero presence — a manual on-ground survey of the pin code is still recommended before committing capital. Area/locality name below comes from the public India Post pincode directory, not from Lucira's own data.</div>
     ${candidates.length ? candidates.map((c,i)=>`
       <div class="insight" style="margin-top:${i?10:0}px"><span class="ii">✦</span><div>
         <b>If Lucira opens a store near pin code ${esc(c.pincode)}</b> (${esc(c.city)}${c.state?', '+esc(c.state):''}) — modelled demand is ~${fmtInt(c.sessions)} sessions / ~${fmtInt(c.users)} distinct users from this pin code, with <b>${fmtInt(c.deals)} real CRM deals</b> already logged (${fmtInt(c.won)} won) and only ~${c.orders!=null?fmtInt(c.orders):'0'} modelled completed orders captured so far — a gap between demand and fulfilment worth investigating.
         <div style="margin-top:4px;color:var(--gold-2)">Area: ${c.area?esc(c.area):'not available (no India Post record for this pin code)'}.</div>
-        <div style="margin-top:4px">${c.cl.length
-          ? `<span class="chip good">● CaratLane here (${c.cl.length})</span> — ${esc(c.cl.map(s=>s.store).join(', '))} (~${fmtInt(c.clTotal)} catalog items) — this pin code is <b>contested</b>, not whitespace.`
-          : `<span class="chip">— No CaratLane found</span> in our captured 112 stores at this exact pin code — a possible <b>whitespace</b> opportunity, but not confirmed absence; verify on the ground.`}</div>
+        <div style="margin-top:4px">${c.caratlane.available
+          ? `<span class="chip good">● CaratLane here (${c.caratlane.storeCount})</span> — ${esc(c.caratlane.storeNames.join(', '))}${c.caratlane.catalogTotal?` (~${fmtInt(c.caratlane.catalogTotal)} catalog items)`:''} — this pin code is <b>contested</b>, not whitespace.`
+          : `<span class="chip">— No CaratLane found</span> in either capture at this exact pin code — a possible <b>whitespace</b> opportunity, but not confirmed absence; verify on the ground.`}</div>
       </div></div>`).join('') : '<div class="empty-note">No pin code currently has enough real deal volume (5+) to rank a store-opening candidate confidently.</div>'}
   </div>
   `;
