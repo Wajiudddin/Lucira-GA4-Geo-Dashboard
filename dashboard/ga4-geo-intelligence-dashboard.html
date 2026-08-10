@@ -295,6 +295,7 @@ select.inp:focus,input.inp:focus{border-color:var(--gold)}
   <div class="mainwrap">
     <header class="top">
       <div class="pagetitle"><b id="pageTitle">Pin Code Intelligence</b><span id="pageSub">Real deals + modelled demand</span></div>
+      <button class="src-dot" id="dateRangeChip" title="Click to change the date range" style="cursor:pointer;border:1px solid var(--hair)"><i style="background:var(--gold)"></i><span id="dateRangeChipLbl">📅 —</span></button>
       <div class="spacer"></div>
       <div class="src-dot" id="srcDot"><i></i><span id="srcDotLbl">Sample data</span></div>
       <button class="btn" id="btnFilters">⚙ Advanced Filters <span class="cnt" id="filterCount" style="display:none"></span></button>
@@ -413,6 +414,20 @@ const PAGE_META = {
   docs:{t:'Documentation', s:'Purpose, sources, logic, how to use'},
   dictionary:{t:'Data Dictionary', s:'Every KPI, defined'},
   chat:{t:'AI Chat', s:'Ask the dashboard a question'},
+};
+/* Whether a page's own data actually re-slices when the header date-range chip changes.
+   Default (absent from this map) = 'filtered' (uses STATE.filters.dateRange, e.g. via
+   filteredCity()/filteredNationalDaily()/filteredZohoDaily()/filteredZohoPincode()).
+   Kept as an explicit exceptions list, single source of truth, so the header badge next
+   to the page title never silently implies a date scope the underlying query doesn't have. */
+const DATE_SCOPE = {
+  campaigns:      {mode:'full',  note:'Full connected window — campaign totals are not broken down by day in the source query.'},
+  roi:            {mode:'full',  note:'Full connected window — built from the same non-daily campaign data as Campaign Performance.'},
+  sessionanalysis:{mode:'full',  note:'Full connected window — session-analysis rows are not broken down by day in the source query.'},
+  salesorders:    {mode:'full',  note:'Full ERP snapshot — this section has its own independent data window, separate from the GA4 date filter above.'},
+  today:          {mode:'fixed', note:"Always the most recent GA4 day available — doesn't change with the date filter above."},
+  docs:           {mode:'na'}, dictionary:{mode:'na'}, chat:{mode:'na'},
+  area:           {mode:'na'}, identified:{mode:'na'}, journey:{mode:'na'}, attribution:{mode:'na'}, webengage:{mode:'na'},
 };
 /* Reasons shown on every gated (not-available) section — single source of truth so the
    wording never drifts between the section itself, Documentation and the Data Dictionary. */
@@ -579,6 +594,21 @@ const DATE_PRESETS = [
 ];
 function ymd(d){ return d.toISOString().slice(0,10); }
 function addDaysISO(iso, days){ const d=new Date(iso+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+days); return ymd(d); }
+function fmtShortDate(iso){ if(!iso) return '—'; const d=new Date(iso+'T00:00:00Z'); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}); }
+/* Renders the header date-range badge for the CURRENT page — the single place that keeps
+   every tab honest about whether its data actually moves with the date filter (see DATE_SCOPE). */
+function renderDateRangeChip(){
+  const chip = $('#dateRangeChip'), lbl = $('#dateRangeChipLbl');
+  if(!chip || !lbl) return;
+  const dr = STATE.filters.dateRange || {};
+  const scope = DATE_SCOPE[STATE.currentPage] || {mode:'filtered'};
+  if(scope.mode==='na'){ chip.style.display='none'; return; }
+  chip.style.display='inline-flex';
+  if(scope.mode==='fixed'){ lbl.textContent = '📅 Latest day: '+fmtShortDate(STATE.D.dateBounds && STATE.D.dateBounds.max); }
+  else if(scope.mode==='full'){ lbl.textContent = '📅 Full window (not date-filtered)'; }
+  else { lbl.textContent = '📅 '+fmtShortDate(dr.start)+' → '+fmtShortDate(dr.end); }
+  chip.title = scope.note ? scope.note : 'Click to change the date range that this and every other filterable tab uses.';
+}
 function setDatePreset(key){
   const max = STATE.D.dateBounds.max, min = STATE.D.dateBounds.min;
   if(!max) return;
@@ -1509,6 +1539,7 @@ function renderActivePage(){
   target.classList.add('on');
   const meta = PAGE_META[id] || {t:id,s:''};
   $('#pageTitle').textContent = meta.t; $('#pageSub').textContent = meta.s;
+  renderDateRangeChip();
   const fn = PAGE_RENDERERS[id];
   if(fn){ try{ target.innerHTML = fn(); wirePageExtras(id); } catch(err){ console.error(err); target.innerHTML = `<div class="card"><b>Render error on this page.</b><div class="hint">${esc(err.message)}</div></div>`; } }
   else target.innerHTML = `<div class="card empty-note">Page not yet built.</div>`;
@@ -2873,6 +2904,7 @@ function initChrome(){
     $('#navCollapseBtn').textContent = STATE.navCollapsed ? '›' : '‹ Collapse';
   });
   $('#btnFilters').addEventListener('click', openDrawer);
+  $('#dateRangeChip').addEventListener('click', openDrawer);
   $('#drawerClose').addEventListener('click', closeDrawer);
   $('#overlay').addEventListener('click', closeDrawer);
   $('#btnApplyFilters').addEventListener('click', applyFiltersFromDrawer);
