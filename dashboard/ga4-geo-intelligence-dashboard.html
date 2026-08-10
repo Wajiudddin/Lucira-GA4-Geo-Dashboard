@@ -318,15 +318,11 @@ select.inp:focus,input.inp:focus{border-color:var(--gold)}
       <section class="page" id="pg-cityperf"></section>
       <section class="page" id="pg-pincode"></section>
       <section class="page" id="pg-caratlane"></section>
-      <section class="page" id="pg-area"></section>
       <section class="page" id="pg-salesorders"></section>
       <section class="page" id="pg-sessionanalysis"></section>
-      <section class="page" id="pg-identified"></section>
       <section class="page" id="pg-journey"></section>
-      <section class="page" id="pg-attribution"></section>
       <section class="page" id="pg-campaigns"></section>
       <section class="page" id="pg-roi"></section>
-      <section class="page" id="pg-webengage"></section>
       <section class="page" id="pg-today"></section>
       <section class="page" id="pg-expansion"></section>
       <section class="page" id="pg-returning"></section>
@@ -374,15 +370,11 @@ const NAV_ITEMS = [
   {id:'exec',            icon:'◆', label:'Executive Summary'},
   {id:'cityoverview',    icon:'⬢', label:'City Overview & Map'},
   {id:'cityperf',        icon:'▲', label:'City Performance'},
-  {id:'area',            icon:'▣', label:'Area Performance'},
   {id:'salesorders',     icon:'🛍', label:'Sales & Orders (ERP)'},
   {id:'sessionanalysis', icon:'↯', label:'Session Analysis'},
-  {id:'identified',      icon:'☻', label:'Identified Users'},
   {id:'journey',         icon:'↝', label:'User Journey'},
-  {id:'attribution',     icon:'⇄', label:'Session-to-Sale Attribution'},
   {id:'campaigns',       icon:'✦', label:'Campaign Performance'},
   {id:'roi',             icon:'$', label:'Marketing ROI'},
-  {id:'webengage',       icon:'✉', label:'WebEngage Users'},
   {id:'today',           icon:'☀', label:"Today's Users"},
   {id:'expansion',       icon:'⌂', label:'High Opportunity Areas'},
   {id:'returning',       icon:'↺', label:'Returning Users'},
@@ -399,15 +391,11 @@ const PAGE_META = {
   cityperf:{t:'City Performance', s:'Rankings · heatmaps · correlations'},
   pincode:{t:'Pin Code Intelligence', s:'Real deals + modelled demand, pin-code by pin-code — store-opening candidates'},
   caratlane:{t:'CaratLane Info', s:"Competitor's public store footprint & catalog mix"},
-  area:{t:'Area Performance', s:'No Area / locality field or Pin→Area master exists in any connected source'},
   salesorders:{t:'Sales & Orders (ERP)', s:'Real completed-order revenue by customer city'},
   sessionanalysis:{t:'Session Analysis', s:'Source · Medium · Campaign · Landing Page — real session-grain'},
-  identified:{t:'Identified Users', s:'No email/mobile/user-id field exists in the GA4 export'},
   journey:{t:'User Journey', s:'Users → Sessions → Cart → Checkout → Deals → Orders → Revenue'},
-  attribution:{t:'Session-to-Sale Attribution', s:'No shared key links a GA4 session to a Deal or Order'},
   campaigns:{t:'Campaign Performance', s:'What is working, where, and why'},
   roi:{t:'Marketing ROI', s:'City × campaign × channel efficiency'},
-  webengage:{t:'WebEngage Users', s:'No WebEngage event/campaign feed is connected'},
   today:{t:"Today's Users", s:'Most recent available GA4 day (export lags ~2 days)'},
   expansion:{t:'High Opportunity Areas', s:'High users, low deals, zero revenue — city-level (no Area/Pin drill exists)'},
   returning:{t:'Returning Users', s:'Real new-vs-returning split from the session-grain fact table'},
@@ -431,7 +419,7 @@ const DATE_SCOPE = {
   caratlane:      {mode:'full',  note:'One-time public data capture (Aug 2026) — has no date dimension at all, independent of the date filter above.'},
   today:          {mode:'fixed', note:"Always the most recent GA4 day available — doesn't change with the date filter above."},
   docs:           {mode:'na'}, dictionary:{mode:'na'}, chat:{mode:'na'},
-  area:           {mode:'na'}, identified:{mode:'na'}, journey:{mode:'na'}, attribution:{mode:'na'}, webengage:{mode:'na'},
+  journey:        {mode:'na'},
 };
 /* Reasons shown on every gated (not-available) section — single source of truth so the
    wording never drifts between the section itself, Documentation and the Data Dictionary. */
@@ -2275,6 +2263,9 @@ PAGE_RENDERERS.pincode = function(){
     ${kpiCard({label:'Deals Created', value:sumBy(rows,r=>r.deals), fmt:fmtInt})}
     ${kpiCard({label:'Modelled Sessions (sum)', value:sumBy(enriched,r=>r.sessions||0), fmt:fmtInt})}
     ${kpiCard({label:'Modelled Users (sum)', value:sumBy(enriched,r=>r.users||0), fmt:fmtInt})}
+    ${kpiCard({label:'Modelled PDP Views (sum)', value:sumBy(enriched,r=>r.pdp||0), fmt:fmtInt})}
+    ${kpiCard({label:'Modelled Add to Cart (sum)', value:sumBy(enriched,r=>r.atc||0), fmt:fmtInt})}
+    ${kpiCard({label:'Modelled Checkout (sum)', value:sumBy(enriched,r=>r.chk||0), fmt:fmtInt})}
     ${kpiCardText('Known Users', 'N/A', 'No identity key at any grain — see Identified Users page')}
     ${kpiCardText('CaratLane Present', fmtInt(pinsWithCaratlane)+' of '+fmtInt(rows.length), 'tracked pin codes matching EITHER CaratLane capture (merged), real exact pin-code match')}
     ${kpiCardText('CaratLane Pincodes (merged, both captures)', fmtInt(allCaratlanePins.size), 'union of the 206-store catalog dataset + the 308-pincode GBP store master')}
@@ -2383,14 +2374,6 @@ PAGE_RENDERERS.caratlane = function(){
   `;
 };
 
-/* ============================== 26b. PAGE — AREA PERFORMANCE (GATED) ============================== */
-PAGE_RENDERERS.area = function(){
-  return `
-  <div class="sec-head"><div><h2>Area Performance</h2><p>Not available — see below for exactly why, and what would unlock it.</p></div></div>
-  ${gateCard('Area Performance', GATE_REASONS.area, 'Pin Code Performance shows the raw, unresolved Zoho pin codes instead — see the Pin Code Performance page.')}
-  `;
-};
-
 /* ============================== 26c. PAGE — SESSION ANALYSIS ============================== */
 PAGE_RENDERERS.sessionanalysis = function(){
   const rows = filteredSessionAnalysis().slice().sort(byDesc(r=>r.sessions));
@@ -2413,14 +2396,6 @@ PAGE_RENDERERS.sessionanalysis = function(){
     [fmtInt(r.purchases), n(r.purchases)], [fmtMoney(r.revenue), n(r.revenue)], [n(r.avg_engagement_sec).toFixed(0)+'s', n(r.avg_engagement_sec)]
   ]), {title:`Source × Medium × Campaign × Landing Page — ${fmtInt(totalSessions)} sessions in window`, searchable:true,
     hint:'Window-level leaderboard (last 90 days of the fact table), independent of the top-level date filter — captioned, not silently mismatched.'})}
-  `;
-};
-
-/* ============================== 26d. PAGE — IDENTIFIED USERS (GATED) ============================== */
-PAGE_RENDERERS.identified = function(){
-  return `
-  <div class="sec-head"><div><h2>Identified Users</h2><p>Not available — see below for exactly why, and what would unlock it.</p></div></div>
-  ${gateCard('Identified Users (Name, Email, Mobile, City, Pin Code, Area, Sessions, Deals, Orders, Revenue, Last Visit)', GATE_REASONS.identified, 'Zoho Deals do carry real Mobile (100% populated) and Email (71% populated) — see Documentation for how those could seed identity resolution once GA4 sends a matching user_id.')}
   `;
 };
 
@@ -2461,22 +2436,6 @@ PAGE_RENDERERS.journey = function(){
       <div class="hint" style="margin-top:10px">Revenue (ERP) = ${fmtMoney(erpRevenue)} across all cities with a known customer address — see Sales &amp; Orders (ERP). GA4-attributed revenue in this same window is ${fmtMoney(n(f.revenue))} (${fmtInt(n(f.purchases))} GA4-tracked purchases) — the two numbers measure different things (see Documentation) and are not meant to reconcile.</div>
     </div>
   </div>
-  `;
-};
-
-/* ============================== 26f. PAGE — SESSION-TO-SALE ATTRIBUTION (GATED) ============================== */
-PAGE_RENDERERS.attribution = function(){
-  return `
-  <div class="sec-head"><div><h2>Session-to-Sale Attribution</h2><p>Not available — see below for exactly why, and what would unlock it.</p></div></div>
-  ${gateCard('Session ID → Client ID → User → City → Pin Code → Deal ID → Order ID → Revenue → Session Duration → Campaign → Source → Medium', GATE_REASONS.attribution, 'Session Analysis and User Journey show the closest available real substitute: same-window, aggregate source/medium/campaign → revenue correlation, without a per-session join.')}
-  `;
-};
-
-/* ============================== 26g. PAGE — WEBENGAGE USERS (GATED) ============================== */
-PAGE_RENDERERS.webengage = function(){
-  return `
-  <div class="sec-head"><div><h2>WebEngage Users</h2><p>Not available — see below for exactly why, and what would unlock it.</p></div></div>
-  ${gateCard('City, Pin Code, Identified Users, Push Sent, Email Sent, WhatsApp Sent, Deals, Orders, Revenue', GATE_REASONS.webengage, null)}
   `;
 };
 
