@@ -266,9 +266,57 @@ select.inp:focus,input.inp:focus{border-color:var(--gold)}
 .searchbox input{background:none;border:none;outline:none;color:var(--ink);width:100%;font-size:12px}
 .export-menu-item-desc{font-size:10px;color:var(--muted);display:block}
 @media print{.nav,header.top,.drawer,.overlay,.pop-overlay,.iconbtn,#chatfab{display:none!important}.mainwrap{margin-left:0!important}.page{display:block!important}}
+/* ---- auth gate ---- */
+body.gate-locked #loader,body.gate-locked #app{display:none!important}
+#authGate{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:var(--bg);background-image:var(--sheen)}
+#authGate.hidden{display:none}
+.gate-card{width:min(360px,88vw);background:var(--glass);border:1px solid var(--glass-brd);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:34px 30px;backdrop-filter:blur(10px)}
+.gate-card .gate-mark{width:56px;height:56px;margin:0 auto 14px}
+.gate-card h2{font-family:var(--serif);text-align:center;color:var(--ink);font-size:20px;margin-bottom:4px}
+.gate-card p.gate-sub{text-align:center;color:var(--muted);font-size:12px;margin-bottom:22px}
+.gate-field{margin-bottom:14px}
+.gate-field label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;letter-spacing:.3px;text-transform:uppercase}
+.gate-field input{width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--hair);background:var(--surface-2);color:var(--ink);font-size:13px;outline:none}
+.gate-field input:focus{border-color:var(--gold)}
+#gateBtn{width:100%;padding:11px;border-radius:9px;background:var(--gold);color:#2a1e10;font-weight:600;font-size:13px;margin-top:6px}
+#gateErr{color:var(--crit);font-size:12px;text-align:center;margin-top:10px;min-height:16px}
 </style>
 </head>
-<body>
+<body class="gate-locked">
+
+<div id="authGate">
+  <div class="gate-card">
+    <svg class="gate-mark" viewBox="0 0 100 100"><rect x="17" y="3" width="66" height="94" rx="33" fill="#fff8f0" stroke="#a05a64" stroke-width="2"/><text x="50" y="58" font-family="Georgia,serif" font-size="42" font-weight="500" text-anchor="middle" fill="#8b6f56">L</text><path d="M50 71 L54.5 78 L50 85 L45.5 78 Z" fill="#a05a64"/></svg>
+    <h2>Lucira · Geo Intelligence</h2>
+    <p class="gate-sub">Sign in to view this dashboard</p>
+    <form id="gateForm" autocomplete="off">
+      <div class="gate-field"><label for="gateUser">Username</label><input id="gateUser" type="text" autocomplete="username" required></div>
+      <div class="gate-field"><label for="gatePass">Password</label><input id="gatePass" type="password" autocomplete="current-password" required></div>
+      <button type="submit" id="gateBtn">Sign In</button>
+      <div id="gateErr"></div>
+    </form>
+  </div>
+</div>
+<script>
+(function(){
+  var KEY='lucira_geo_auth_ok';
+  var U='admin-Lucira', P='password-admin@2026';
+  var gate=document.getElementById('authGate');
+  function unlock(){document.body.classList.remove('gate-locked');gate.classList.add('hidden');}
+  if(sessionStorage.getItem(KEY)==='1'){unlock();}
+  document.getElementById('gateForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    var u=document.getElementById('gateUser').value.trim();
+    var p=document.getElementById('gatePass').value;
+    if(u===U && p===P){
+      sessionStorage.setItem(KEY,'1');
+      unlock();
+    }else{
+      document.getElementById('gateErr').textContent='Incorrect username or password.';
+    }
+  });
+})();
+</script>
 
 <div id="loader">
   <div class="load-mark">
