@@ -300,7 +300,7 @@ body.gate-locked #loader,body.gate-locked #app{display:none!important}
 <script>
 (function(){
   var KEY='lucira_geo_auth_ok';
-  var U='admin-Lucira', P='password-admin@2026';
+  var U='Lucira', P='admin@2026';
   var gate=document.getElementById('authGate');
   function unlock(){document.body.classList.remove('gate-locked');gate.classList.add('hidden');}
   if(sessionStorage.getItem(KEY)==='1'){unlock();}
