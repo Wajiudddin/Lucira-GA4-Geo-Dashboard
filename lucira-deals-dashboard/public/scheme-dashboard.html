@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Scheme Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="scheme-dashboard-style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <header class="app-header">
+      <div>
+        <h1>SCHEME DASHBOARD</h1>
+        <p class="subtitle">BigQuery &middot; Pos.scheme_enrollment + Lucira_Prod.scheme_monthly_details + Lucira_Prod.scheme_payment</p>
+      </div>
+      <div class="header-actions">
+        <span id="updatedAt" class="updated-at"></span>
+        <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+        <button id="refreshBtn" class="refresh-btn">Refresh</button>
+
+        <div class="filters-dropdown" id="filtersDropdown">
+          <button type="button" class="filters-toggle" id="filtersToggle">
+            Filters <span class="filters-toggle-caret">&#9662;</span>
+          </button>
+
+          <div class="filters-panel" id="filtersPanel" hidden>
+            <div class="filter-section">
+              <div class="filter-section-title">Store / Company</div>
+              <div class="multiselect" id="companyMultiselect">
+                <button type="button" class="multiselect-toggle" id="companyToggle">All companies</button>
+                <div class="multiselect-panel" id="companyPanel" hidden></div>
+              </div>
+            </div>
+
+            <div class="filter-section">
+              <div class="filter-section-title">Status</div>
+              <div class="multiselect" id="statusMultiselect">
+                <button type="button" class="multiselect-toggle" id="statusToggle">All statuses</button>
+                <div class="multiselect-panel" id="statusPanel" hidden></div>
+              </div>
+            </div>
+
+            <div class="filter-section">
+              <div class="filter-section-title">Maturity (Year-Month)</div>
+              <div class="multiselect" id="maturityMultiselect">
+                <button type="button" class="multiselect-toggle" id="maturityToggle">All maturities</button>
+                <div class="multiselect-panel" id="maturityPanel" hidden></div>
+              </div>
+            </div>
+
+            <div class="filter-meta" id="filterMeta"></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div id="statusBar" class="status-bar" hidden></div>
+
+    <div class="date-quickbar" id="dateQuickbar">
+      <button type="button" class="option-btn" data-range="today">Today</button>
+      <button type="button" class="option-btn" data-range="yesterday">Yesterday</button>
+      <button type="button" class="option-btn" data-range="last7">Last 7 Days</button>
+      <button type="button" class="option-btn" data-range="last30">Last 30 Days</button>
+      <button type="button" class="option-btn is-active" data-range="all">All Time</button>
+      <button type="button" class="option-btn" data-range="custom">Custom</button>
+      <span class="date-quickbar-custom" id="dateQuickbarCustom" hidden>
+        <input type="date" id="quickDateFrom" />
+        <span>to</span>
+        <input type="date" id="quickDateTo" />
+        <button type="button" id="quickDateApply" class="apply-filters-btn">Apply</button>
+      </span>
+    </div>
+
+    <div class="page-tabs">
+      <button class="page-tab-btn is-active" data-panel="dashboardPanel">Scheme Dashboard</button>
+      <button class="page-tab-btn" data-panel="logicPanel">Scheme Logic</button>
+    </div>
+
+    <!-- ============================ Scheme Dashboard ============================ -->
+    <section class="page-panel is-active" id="dashboardPanel">
+      <div class="kpi-grid" id="kpiGrid"></div>
+
+      <div class="table-heading-row">
+        <h2 class="table-heading">This Month's Due</h2>
+        <span class="th-sub" id="currentMonthMeta"></span>
+      </div>
+      <div class="filter-section" style="max-width:320px; margin-bottom:12px;">
+        <div class="filter-section-title">Store</div>
+        <div class="multiselect" id="currentMonthStoreMultiselect">
+          <button type="button" class="multiselect-toggle" id="currentMonthStoreToggle">All stores</button>
+          <div class="multiselect-panel" id="currentMonthStorePanel" hidden></div>
+        </div>
+      </div>
+      <input type="text" id="currentMonthSearch" class="table-search" placeholder="Search customer, mobile or company..." />
+      <div class="table-wrap table-wrap--scroll-y table-wrap--spaced">
+        <table class="report-table" id="currentMonthTable">
+          <thead id="currentMonthTableHead"></thead>
+          <tbody id="currentMonthBody"></tbody>
+        </table>
+      </div>
+      <button class="export-btn" data-export-table="currentMonthTable" data-export-filename="this-months-due">&#8595; Export CSV</button>
+
+      <div class="table-heading-row">
+        <h2 class="table-heading">Overdue Enrollments</h2>
+        <span class="th-sub" id="overdueMeta"></span>
+      </div>
+      <input type="text" id="overdueSearch" class="table-search" placeholder="Search customer, mobile or company..." />
+      <div class="table-wrap table-wrap--scroll-y table-wrap--spaced">
+        <table class="report-table" id="overdueTable">
+          <thead id="overdueTableHead"></thead>
+          <tbody id="overdueBody"></tbody>
+        </table>
+      </div>
+      <button class="export-btn" data-export-table="overdueTable" data-export-filename="overdue-enrollments">&#8595; Export CSV</button>
+
+      <h2 class="table-heading">By Store / Company</h2>
+      <div id="companySummaryContainer"></div>
+
+      <div class="table-heading-row">
+        <h2 class="table-heading">Enrollment Detail</h2>
+        <span class="th-sub" id="detailMeta"></span>
+      </div>
+      <div id="enrollmentTableContainer"></div>
+    </section>
+
+    <!-- ============================ Scheme Logic ============================ -->
+    <section class="page-panel" id="logicPanel">
+      <div class="logic-box">
+        <h2 class="logic-box-title">SCHEME DASHBOARD LOGIC</h2>
+        <div class="logic-box-columns">
+          <ol class="logic-list">
+            <li>Grain is <strong>one enrollment = one row</strong>. Installments (scheme_monthly_details) and payments (scheme_payment) are pulled and aggregated separately, then joined back onto each enrollment &mdash; never flattened into one query, since both fan out independently against the enrollment and would double-count collections and overdue amounts if joined directly.</li>
+            <li><strong>Collected</strong> = sum of all scheme_payment rows for that enrollment (payment_till_now). <strong>Committed</strong> = scheme_amount. Collection Rate % = Collected &divide; Committed.</li>
+            <li><strong>Status:</strong> Cancelled beats Matured beats Redeemed beats Active (in progress) &mdash; a cancelled scheme is terminal even if other flags are set.</li>
+            <li><strong>Overdue</strong> installment = payment_made is false and due_date is before today. Ageing buckets are days between due_date and today. <strong>Upcoming</strong> = next unpaid installment with due_date on or after today.</li>
+            <li><strong>Maturity calendar</strong> groups active (non-cancelled) enrollments by maturity_year + maturity_month to show committed value maturing ahead.</li>
+            <li><strong>Plan</strong> is scheme_id as recorded on the enrollment &mdash; there is no separate scheme name/product table in the source data, so plans show as numeric IDs.</li>
+            <li>Filters (company, status, maturity, date range, search) apply to every KPI and table together. Data refreshes every 15 minutes, or click Refresh for the latest right away.</li>
+          </ol>
+          <div class="logic-flow">
+            <div class="logic-flow-step">SCHEME_ENROLLMENT (one row per signup)</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">+ PAYMENT_TILL_NOW (pre-aggregated SUM per enrollment)</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">+ COMPANY &amp; PARTY NAMES</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">SCHEME_MONTHLY_DETAILS &rarr; ROLL UP OVERDUE / NEXT DUE PER ENROLLMENT</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">DERIVE STATUS (CANCELLED &gt; MATURED &gt; REDEEMED &gt; ACTIVE)</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">SPLIT BY COMPANY, PLAN, CUSTOMER &amp; MATURITY MONTH</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="scheme-dashboard.js"></script>
+</body>
+</html>

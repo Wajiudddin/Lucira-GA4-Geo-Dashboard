@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jewelry Refill Management</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="refill-management-style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <header class="app-header">
+      <div>
+        <h1>JEWELRY REFILL MANAGEMENT</h1>
+        <p class="subtitle">BigQuery &middot; Sales (marketing_sale) + Stock (Live_inventory) + Purchase Orders + GA4 PDP &middot; RTS only</p>
+      </div>
+      <div class="header-actions">
+        <span id="updatedAt" class="updated-at"></span>
+        <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+        <button id="refreshBtn" class="refresh-btn">Refresh</button>
+      </div>
+    </header>
+
+    <div class="filters-bar">
+      <div class="filter-section-title">Sales Window</div>
+      <div class="window-toggle" id="windowToggle">
+        <button type="button" class="option-btn is-active" data-window="90d">Last 90 Days</button>
+        <button type="button" class="option-btn" data-window="all">Overall</button>
+      </div>
+
+      <div class="filter-section-title">Store</div>
+      <div class="multiselect" id="storeMultiselect">
+        <button type="button" class="multiselect-toggle" id="storeToggle">All stores</button>
+        <div class="multiselect-panel" id="storePanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">HO Stock Status</div>
+      <div class="multiselect" id="hoMultiselect">
+        <button type="button" class="multiselect-toggle" id="hoToggle">All</button>
+        <div class="multiselect-panel" id="hoPanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">PO Status</div>
+      <div class="multiselect" id="poMultiselect">
+        <button type="button" class="multiselect-toggle" id="poToggle">All</button>
+        <div class="multiselect-panel" id="poPanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">Peer Stock Status</div>
+      <div class="multiselect" id="peerMultiselect">
+        <button type="button" class="multiselect-toggle" id="peerToggle">All</button>
+        <div class="multiselect-panel" id="peerPanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">Metal</div>
+      <div class="multiselect" id="metalMultiselect">
+        <button type="button" class="multiselect-toggle" id="metalToggle">All metals</button>
+        <div class="multiselect-panel" id="metalPanel" hidden></div>
+      </div>
+
+      <button type="button" id="applyFilters" class="apply-filters-btn">Apply</button>
+
+      <span class="filter-meta" id="filterMeta"></span>
+    </div>
+
+    <div id="statusBar" class="status-bar" hidden></div>
+    <div id="dataQualityBanner" class="data-quality-banner" hidden></div>
+
+    <div class="page-tabs">
+      <button class="page-tab-btn is-active" data-panel="dashboardPanel">Refill Dashboard</button>
+      <button class="page-tab-btn" data-panel="logicPanel">Refill Logic</button>
+    </div>
+
+    <!-- ============================ Refill Dashboard ============================ -->
+    <section class="page-panel is-active" id="dashboardPanel">
+      <div class="kpi-grid" id="kpiGrid"></div>
+
+      <div class="charts-grid" id="chartsGrid"></div>
+
+      <div class="table-heading-row">
+        <h2 class="table-heading">Refill list by store</h2>
+        <span class="th-sub" id="refillTableMeta"></span>
+        <span class="th-sub" id="refillDrillBadge"></span>
+      </div>
+      <div class="filter-section" style="max-width:320px; margin-bottom:12px;">
+        <div class="filter-section-title">Store</div>
+        <div class="multiselect" id="refillStoreMultiselect">
+          <button type="button" class="multiselect-toggle" id="refillStoreToggle">All stores</button>
+          <div class="multiselect-panel" id="refillStorePanel" hidden></div>
+        </div>
+      </div>
+      <input type="text" id="tableSearch" class="table-search" placeholder="Search SKU, style, store..." />
+      <div class="table-wrap table-wrap--scroll-y table-wrap--spaced">
+        <table class="report-table" id="refillTable">
+          <thead id="refillTableHead"></thead>
+          <tbody id="refillTableBody"></tbody>
+        </table>
+      </div>
+      <button class="export-btn" data-export-table="refillTable" data-export-filename="refill-list">&#8595; Export CSV</button>
+    </section>
+
+    <!-- ============================ Refill Logic ============================ -->
+    <section class="page-panel" id="logicPanel">
+      <div class="logic-box">
+        <h2 class="logic-box-title">REFILL LOGIC</h2>
+        <div class="logic-box-columns">
+          <ol class="logic-list">
+            <li>SKU must have sold at least once at the same store, ever (full sales history, no date cutoff).</li>
+            <li>Sales Window filter (top bar) toggles the whole dashboard between Last 90 Days and Overall (all-time); defaults to Last 90 Days.</li>
+            <li>Fulfillment is RTS only.</li>
+            <li>Returned and exchanged sales are ignored: a sale is skipped when its Item Line No appears in a sales return (return / return_items) or an exchange (exchange / exchange_items) dated on or after the sale. If the SKU has other sales that were not returned or exchanged it still qualifies on those; a later re-sale of the same unit counts again.</li>
+            <li>Gold Coin, Silver Coin, and Silver jewelry (by item_group_name or metal) are excluded from all sales figures.</li>
+            <li>Customize-order styles are excluded: COR, COE, COP/COPD, COB, COC, CNP, CTN, CNK prefixes (not real stock, made to order).</li>
+            <li>Exact SKU must currently have 0 stock at that store. Store Stock = number of units of that exact SKU in the same store (the store that sold it), not other stores or HO.</li>
+            <li>Store Stock and HO On Hand count only location "Finish Goods" &mdash; Repair, Vendor Return, Melting Stock, Market Place and every other location are excluded. Malleshwaram (MAL) has no Finish Goods stock rows of its own, so every SKU it sold shows Store Stock 0.</li>
+            <li>SKU is matched by exact SKU + Size + Metal/Variant.</li>
+            <li>Store sales are based on Billing Company (company_code), not Location.</li>
+            <li>Reorder quantity is always 1.</li>
+            <li>HO On Hand shows exact SKU stock at Head Office.</li>
+            <li>Transfer Date = the date the stock reached the selling store. It is searched in this order, stopping at the first source that has a date (the latest one on or before the Last Sold Date): (1) stock_in_Store by store + SKU &mdash; for HWI, consignment_out, then stock_transfer, by Item Line No; (2) the same sources under the unit's previous Item Line No, when an allocation changed the line no (stock_allocation_items &rarr; stock_allocated_items); (3) branch_receipt; (4) finishing &mdash; steps 3 and 4 by Item Line No, then the previous Item Line No. Document No is the document number from the same source. Only the selling store's own transfer is used (never another store's or HO's copy of the same transfer; for steps 3 and 4 the document number must start with the selling store code; HWI uses HO documents). Both show &mdash; when no source has a date.</li>
+            <li>Ageing = Last Sold Date &minus; Transfer Date.</li>
+            <li>Sales Cycle is Below 180 (&le;180 days) or Above 180 (&gt;180 days); Unknown when no qualifying transfer record exists.</li>
+            <li>PO is valid only when PO Raised Date &gt; Last Sold Date. PO validity is SKU-level only &mdash; no store-level PO linkage exists in source data.</li>
+            <li>Old POs (raised before the last sale) are ignored.</li>
+            <li>Network and Peer Store Availability are matched at the style level (any size/metal variant of the same style counts), not exact SKU.</li>
+            <li>Network Availability requires &ge;2 units at a location.</li>
+            <li>Single-unit locations are excluded from Network Availability.</li>
+            <li>HO, HWI Ventures, and the selling store itself are excluded from Peer Store Availability.</li>
+            <li>Network/Peer Availability is shown as City-Qty(AgeingDays), e.g. "Borivali-1(254)" &mdash; city/area name, not the store code.</li>
+            <li>Peer stock aged &gt;180 days is highlighted RED (oldest unit at that store).</li>
+            <li>Lifetime Sales is shown only when at least one peer stock is &gt;180 days old.</li>
+            <li>Lifetime Sales is Store + Style level and includes all sizes/metals/variants.</li>
+            <li>Lifetime Sales of 1&ndash;2 is GREEN.</li>
+            <li>T-1 compares today's list with the previous run.</li>
+            <li>Refill Status shows TRANSFER SENT (with date) when stock_in_Store has a transfer of that exact SKU into the selling store dated after its Last Sold Date. The row stays on the list; the transfer is logged on issue, so the SKU may not yet show in store stock. This check uses stock_in_Store only, so it is not applied to HWI consignment / stock_transfer movements.</li>
+            <li>PDP Views and ATC are lifetime (all dates, no date window) from GA4 (ga4_data), summed at style level &mdash; every variant/size of the style, e.g. LJ-R00034-14YWG-12 &rarr; style R00034.</li>
+            <li>ATC Ratio = lifetime ATC &divide; lifetime PDP Views &times; 100 (style level); shown as &mdash; when there are no PDP Views.</li>
+            <li>Lifetime Sale column = number of RTS sales of the exact SKU across all stores (same RTS / coin / silver / customize-order filters; returned and exchanged sales are not removed from this count).</li>
+            <li>Item Line No is the ERP item_line_no of the unit on the SKU's last sale at that store (marketing_sale); it is the key used to look up Transfer Date and Document No in the consignment, stock_transfer, branch receipt and finishing tables, and to find returned / exchanged sales.</li>
+            <li>Product image is matched by SKU from Shopify's own catalog where available; click the thumbnail to open it full size.</li>
+          </ol>
+          <div class="logic-flow">
+            <div class="logic-flow-step">SOLD AT LEAST ONCE, EVER (RTS ONLY)</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">EXCLUDE COINS, SILVER, CUSTOMIZE-ORDER STYLES</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">EXCLUDE RETURNED / EXCHANGED SALES</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CURRENT STOCK = 0</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK HO</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK TRANSFER SENT</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK VALID PO</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK NETWORK STOCK</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK PEER STOCK</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK AGEING &gt;180</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK LIFETIME STYLE SALES</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">TRANSFER OPPORTUNITY</div>
+          </div>
+        </div>
+        <h2 class="logic-box-title">DATA SOURCES (BigQuery project lucirajewelry-prod unless stated)</h2>
+        <div class="table-wrap">
+          <table class="report-table">
+            <thead><tr><th>Data on dashboard</th><th>Source table(s)</th><th>Columns / rule used</th></tr></thead>
+            <tbody>
+            <tr><td>Sold orders: Store, SKU, Style, Metal, Last Sold, quantity sold</td><td>ds_imputed_reporting.marketing_sale</td><td>Columns company_code (store = Billing Company), Full_sku, half_sku (style), style_name, metal_name, karat_name, metal_color_code, Transaction_Date (MAX = Last Sold), pieces. Filters: Fullfillment = RTS; excludes Gold/Silver Coin (type_name), Silver (item_group_name, metal_name) and customize-order half_sku prefixes (COR, COE, COP, COB, COC, CNP, CTN, CNK). No date limit.</td></tr>
+            <tr><td>Returned / exchanged-sale exclusion</td><td>ornaverse_erp_administration.return + return_items; Lucira_Prod.exchange + exchange_items</td><td>Each pair joined on transaction_id; return_items / exchange_items.item_line_no matched to the sale's item_line_no, document_date on or after the sale date. Matching sales are dropped from the refill sales list (not from Lifetime Sale counts).</td></tr>
+            <tr><td>Item Line No</td><td>ds_imputed_reporting.marketing_sale</td><td>item_line_no of the unit on the latest sale (Transaction_Date) for that store + SKU.</td></tr>
+            <tr><td>Lifetime Sale (SKU) and peer Lifetime Sales (Store + Style)</td><td>ds_imputed_reporting.marketing_sale</td><td>Same RTS filters and exclusions. SKU column: count per Full_sku, all stores. Peer Lifetime Sales: count per company_code + half_sku (all sizes/metals).</td></tr>
+            <tr><td>Store Stock, HO On Hand, Size, Network and Peer Availability</td><td>ds_imputed_reporting.Live_inventory</td><td>One row per physical unit. Columns Store_name, Full_sku, style_code, item_size_name; only location_name = "Finish Goods". Stock = row count. Exact-SKU for Store Stock / HO On Hand; style_code for Network / Peer.</td></tr>
+            <tr><td>Peer-store ageing (days)</td><td>ds_imputed_reporting.Live_inventory</td><td>Today &minus; MIN(document_date) of the style's units at that store (same Finish Goods filter).</td></tr>
+            <tr><td>Transfer Date, Document No &mdash; step 1 (all stores except HWI)</td><td>ornaverse_erp_administration.stock_in_Store + ds_imputed_reporting.items</td><td>stock_in_Store: company_code, item_line_no, item_id, Transfer_date, document_no (= Document No of that transfer); latest transfer per item_line_no and store kept (one transfer is logged under every company its document touches). items maps item_id to item_code (= Full_sku). Matched on store + SKU, latest Transfer_date on or before Last Sold.</td></tr>
+            <tr><td>Transfer Date, Document No &mdash; step 1 (HWI, company_code FCS), first source</td><td>Lucira_Prod.consignment_out + Lucira_Prod.consignment_out_items</td><td>Joined on transaction_id. Transfer Date = consignment_out.document_date and Document No = consignment_out.document_no, mapped by consignment_out_items.item_line_no = the sale's Item Line No.</td></tr>
+            <tr><td>Transfer Date, Document No &mdash; step 1 (HWI), second source when no consignment record</td><td>Lucira_Prod.stock_transfer + Lucira_Prod.stock_transfer_items</td><td>Joined on transaction_id. Transfer Date = stock_transfer.document_date and Document No = stock_transfer.document_no, mapped by stock_transfer_items.item_line_no = the sale's Item Line No.</td></tr>
+            <tr><td>Previous Item Line No &mdash; step 2 (units whose line no changed)</td><td>Lucira_Prod.stock_allocation_items + Lucira_Prod.stock_allocated_items</td><td>Joined on transaction_item_id. The sale's item_line_no matches stock_allocation_items.item_line_no; the joined stock_allocated_items.item_line_no is the line no before the change. Used only when no Transfer Date is found under the current Item Line No: that previous line no is looked up in stock_in_Store (all stores) and, for HWI, in consignment-out / stock_transfer.</td></tr>
+            <tr><td>Transfer Date, Document No &mdash; step 3 (any store)</td><td>Lucira_Prod.branch_receipt + Lucira_Prod.branch_receipt_items</td><td>Joined on transaction_id. Transfer Date = branch_receipt.document_date and Document No = branch_receipt.document_no, mapped by branch_receipt_items.item_line_no = the sale's Item Line No (then its previous Item Line No). Only used when no earlier source found a date; latest date on or before the Last Sold Date.</td></tr>
+            <tr><td>Transfer Date, Document No &mdash; step 4 (any store)</td><td>Lucira_Prod.finishing + Lucira_Prod.finishing_items</td><td>Joined on transaction_id. Transfer Date = finishing.document_date and Document No = finishing.document_no, mapped by finishing_items.item_line_no = the sale's Item Line No (then its previous Item Line No). Only used when none of the earlier sources, including branch receipt, found a date; latest date on or before the Last Sold Date.</td></tr>
+            <tr><td>Refill Status (TRANSFER SENT)</td><td>ornaverse_erp_administration.stock_in_Store + ds_imputed_reporting.items</td><td>Shown when a transfer of the exact SKU into the store is dated after its Last Sold Date. Transfer is logged on issue, before the unit reaches Live_inventory. Not applied from the HWI consignment/stock_transfer tables.</td></tr>
+            <tr><td>PO No, PO Date, PO Raised, PO Status</td><td>purchase.order_items + purchase.order + ds_imputed_reporting.items</td><td>Joined order_items.transaction_id = order.transaction_id; items maps item_id to Full_sku. PO No = document_no, PO Date = document_date, PO Raised = creation_date. Valid only if PO Raised &gt; Last Sold. SKU-level (no store link exists).</td></tr>
+            <tr><td>PDP Views, ATC, ATC Ratio</td><td>ga4_data.ga4_data</td><td>SUM(pdp_views) and SUM(add_to_cart) over all dates (lifetime, no date window), grouped by style = 2nd segment of sku (LJ-R00034-14YWG-12 &rarr; R00034). ATC Ratio = ATC &divide; PDP Views &times; 100. Rows with null pdp_views are skipped. Site-wide 90-day PDP trend chart uses the same table.</td></tr>
+            <tr><td>Product image</td><td>Lucira_Prod.Lucira_Shopify_products + ds_imputed_reporting.product_view_table</td><td>Shopify variants/images (non-certificate image, first per variant) joined to product_view_table on variant_id for the SKU; first image per SKU.</td></tr>
+            <tr><td>Store code &harr; Store name mapping</td><td>Fixed in the dashboard code</td><td>HO, LPN, N18, PV1, PN1, BO1, FCS (shown as HWI), MAL &harr; Live_inventory Store_name. Not a BigQuery table.</td></tr>
+            <tr><td>T-1 (newly flagged / still pending / no longer required)</td><td>refill-snapshot.json on the dashboard server</td><td>Previous run's saved list compared with today's. Not BigQuery.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="refill-management.js"></script>
+</body>
+</html>

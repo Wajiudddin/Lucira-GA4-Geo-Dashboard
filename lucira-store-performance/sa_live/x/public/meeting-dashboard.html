@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Meeting Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="meeting-dashboard-style.css" />
+<script src="theme.js"></script>
+</head>
+<body class="md-page">
+  <div class="viz-root">
+    <header class="app-header">
+      <div>
+        <h1>Meeting Dashboard</h1>
+        <p class="subtitle">Zoho CRM Deals (live) + BigQuery cdc_meetings &amp; walkin_data &middot; Meeting &rarr; Walk-in &rarr; Order journey</p>
+      </div>
+      <div class="header-actions">
+        <span id="updatedAt" class="updated-at"></span>
+        <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+        <button id="refreshBtn" class="refresh-btn">Refresh</button>
+      </div>
+    </header>
+
+    <div class="filters-bar">
+      <div class="filter-group">
+        <div class="filter-section-title">Date</div>
+        <div class="filters-bar-dates">
+          <label for="dateFrom">From</label>
+          <input type="date" id="dateFrom" />
+          <label for="dateTo">To</label>
+          <input type="date" id="dateTo" />
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-section-title">Store</div>
+        <div class="multiselect" id="storeMultiselect">
+          <button type="button" class="multiselect-toggle" id="storeToggle">All stores</button>
+          <div class="multiselect-panel" id="storePanel" hidden></div>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-section-title">Agent</div>
+        <div class="multiselect" id="agentMultiselect">
+          <button type="button" class="multiselect-toggle" id="agentToggle">All agents</button>
+          <div class="multiselect-panel" id="agentPanel" hidden></div>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-section-title">City</div>
+        <div class="multiselect" id="cityMultiselect">
+          <button type="button" class="multiselect-toggle" id="cityToggle">All cities</button>
+          <div class="multiselect-panel" id="cityPanel" hidden></div>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-section-title">Meeting Status</div>
+        <div class="multiselect" id="statusMultiselect">
+          <button type="button" class="multiselect-toggle" id="statusToggle">All statuses</button>
+          <div class="multiselect-panel" id="statusPanel" hidden></div>
+        </div>
+      </div>
+
+      <button type="button" id="applyFilters" class="apply-filters-btn">Apply</button>
+    </div>
+
+    <div id="statusBar" class="status-bar" hidden></div>
+
+    <div class="page-tabs">
+      <button type="button" class="page-tab-btn is-active" data-panel="dashboardPanel">Dashboard</button>
+      <button type="button" class="page-tab-btn" data-panel="logicPanel">Logic</button>
+    </div>
+
+    <section class="page-panel is-active" id="dashboardPanel">
+      <div id="kpiGrid" class="kpi-grid"></div>
+
+      <section class="md-card">
+        <h2 class="table-heading">Deals by City</h2>
+        <div id="cityDealsContainer"></div>
+      </section>
+
+      <section class="md-card">
+        <h2 class="table-heading">Store-wise Meetings</h2>
+        <div id="storeMeetingsContainer"></div>
+      </section>
+
+      <section class="md-card">
+        <h2 class="table-heading">Store-wise Conversion &mdash; Meeting &rarr; Walk-in &rarr; Order</h2>
+        <div id="conversionContainer"></div>
+      </section>
+
+      <section class="md-card md-card--highlight">
+        <div class="table-heading-row">
+          <h2 class="table-heading">Today's Meetings</h2>
+          <span class="th-sub" id="todaysMeetingsMeta"></span>
+        </div>
+        <div id="todaysMeetingsContainer"></div>
+      </section>
+
+      <section class="md-card">
+        <h2 class="table-heading">All Meetings</h2>
+        <input type="text" id="meetingSearch" class="table-search" placeholder="Search agent, store, city, customer..." />
+        <div id="allMeetingsContainer"></div>
+      </section>
+    </section>
+
+    <section class="page-panel" id="logicPanel">
+      <div class="logic-box">
+        <h2 class="logic-box-title">HOW THIS DASHBOARD IS CALCULATED</h2>
+        <div class="logic-box-columns">
+          <ul class="logic-list" id="dataNotesList"></ul>
+          <div class="logic-flow">
+            <div class="logic-flow-step">MEETING RAISED<br><span class="th-sub">cdc_meetings, by owner/venue &rarr; store</span></div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">LINKED TO A ZOHO DEAL<br><span class="th-sub">meeting.What_Id.id &rarr; Deal.id (live Zoho API)</span></div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CUSTOMER MOBILE RESOLVED<br><span class="th-sub">from the linked deal</span></div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">WALK-IN MATCHED<br><span class="th-sub">walkin_data, same mobile, on/after visit date</span></div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">ORDER MATCHED<br><span class="th-sub">marketing_sale (Channel = Store), same mobile, on/after visit date</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="meeting-dashboard.js"></script>
+</body>
+</html>

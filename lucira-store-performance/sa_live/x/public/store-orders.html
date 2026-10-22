@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Order Details</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="store-performance-style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+  <div class="viz-root sp-root so-root">
+    <header class="sp-header">
+      <div class="sp-header-titles">
+        <div class="sp-brand-eyebrow">LUCIRA JEWELRY</div>
+        <h1>Order Details</h1>
+        <p class="sp-subtitle" id="soSubtitle">Loading&hellip;</p>
+      </div>
+      <div class="sp-header-right">
+        <div class="sp-header-actions">
+          <a class="sp-refresh-btn so-back" href="store-performance.html">&larr; Back to dashboard</a>
+          <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="soStatus" class="status-bar" hidden></div>
+
+    <div id="soKpis" class="sp-kpi-grid so-kpis" hidden></div>
+
+    <section class="sp-section" id="soTableSection" hidden>
+      <div class="sp-section-head so-head">
+        <div>
+          <h2 class="sp-section-title">Bills</h2>
+          <p class="sp-section-desc" id="soCountNote"></p>
+        </div>
+        <input type="search" id="soFilter" class="so-filter" placeholder="Search bill no, line no, SKU, product, GRN / APU&hellip;" aria-label="Filter bills" />
+      </div>
+      <div class="table-wrap so-wrap">
+        <table class="report-table so-table" id="soTable">
+          <thead id="soHead"></thead>
+          <tbody id="soBody"></tbody>
+        </table>
+      </div>
+      <button class="export-btn" id="soExport" type="button">&#8595; Export CSV</button>
+      <p class="sp-section-desc so-foot">
+        Purchase Amount comes from the purchase invoice (GRN); if the piece has none, from the consignment-in (APU). The
+        document number it came from is shown next to it. Sales / Purchase Amount and Margin use only item lines found in both
+        the sales and a purchase cost record, so pre-order (RPO) bills usually show &mdash;.
+      </p>
+    </section>
+
+    <div id="soEmpty" class="sp-empty" hidden>
+      <p class="sp-empty-title">No bills found</p>
+      <p class="sp-empty-desc">There are no in-store bills for this store and period.</p>
+    </div>
+  </div>
+  <script src="store-orders.js"></script>
+</body>
+</html>

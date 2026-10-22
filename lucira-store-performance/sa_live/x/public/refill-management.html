@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jewelry Refill Management</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="refill-management-style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <header class="app-header">
+      <div>
+        <h1>JEWELRY REFILL MANAGEMENT</h1>
+        <p class="subtitle">BigQuery &middot; Sales (marketing_sale) + Stock (Live_inventory) + Purchase Orders + GA4 PDP &middot; RTS only</p>
+      </div>
+      <div class="header-actions">
+        <span id="updatedAt" class="updated-at"></span>
+        <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+        <button id="refreshBtn" class="refresh-btn">Refresh</button>
+      </div>
+    </header>
+
+    <div class="filters-bar">
+      <div class="filter-section-title">Sales Window</div>
+      <div class="window-toggle" id="windowToggle">
+        <button type="button" class="option-btn is-active" data-window="90d">Last 90 Days</button>
+        <button type="button" class="option-btn" data-window="all">Overall</button>
+      </div>
+
+      <div class="filter-section-title">Store</div>
+      <div class="multiselect" id="storeMultiselect">
+        <button type="button" class="multiselect-toggle" id="storeToggle">All stores</button>
+        <div class="multiselect-panel" id="storePanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">HO Stock Status</div>
+      <div class="multiselect" id="hoMultiselect">
+        <button type="button" class="multiselect-toggle" id="hoToggle">All</button>
+        <div class="multiselect-panel" id="hoPanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">PO Status</div>
+      <div class="multiselect" id="poMultiselect">
+        <button type="button" class="multiselect-toggle" id="poToggle">All</button>
+        <div class="multiselect-panel" id="poPanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">Peer Stock Status</div>
+      <div class="multiselect" id="peerMultiselect">
+        <button type="button" class="multiselect-toggle" id="peerToggle">All</button>
+        <div class="multiselect-panel" id="peerPanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">Transfer Status</div>
+      <div class="multiselect" id="transferMultiselect">
+        <button type="button" class="multiselect-toggle" id="transferToggle">All</button>
+        <div class="multiselect-panel" id="transferPanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">Metal</div>
+      <div class="multiselect" id="metalMultiselect">
+        <button type="button" class="multiselect-toggle" id="metalToggle">All metals</button>
+        <div class="multiselect-panel" id="metalPanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">Already Sent</div>
+      <label class="intransit-toggle"><input type="checkbox" id="showInTransit"> Show rows already sent to the store</label>
+
+      <button type="button" id="applyFilters" class="apply-filters-btn">Apply</button>
+
+      <span class="filter-meta" id="filterMeta"></span>
+    </div>
+
+    <div id="statusBar" class="status-bar" hidden></div>
+    <div id="dataQualityBanner" class="data-quality-banner" hidden></div>
+
+    <div class="page-tabs">
+      <button class="page-tab-btn is-active" data-panel="dashboardPanel">Refill Dashboard</button>
+      <button class="page-tab-btn" data-panel="logicPanel">Refill Logic</button>
+    </div>
+
+    <!-- ============================ Refill Dashboard ============================ -->
+    <section class="page-panel is-active" id="dashboardPanel">
+      <div class="kpi-grid" id="kpiGrid"></div>
+
+      <div class="charts-grid" id="chartsGrid"></div>
+
+      <div class="table-heading-row">
+        <h2 class="table-heading">Refill list by store</h2>
+        <span class="th-sub" id="refillTableMeta"></span>
+        <span class="th-sub" id="refillDrillBadge"></span>
+      </div>
+      <div class="filter-section" style="max-width:320px; margin-bottom:12px;">
+        <div class="filter-section-title">Store</div>
+        <div class="multiselect" id="refillStoreMultiselect">
+          <button type="button" class="multiselect-toggle" id="refillStoreToggle">All stores</button>
+          <div class="multiselect-panel" id="refillStorePanel" hidden></div>
+        </div>
+      </div>
+      <input type="text" id="tableSearch" class="table-search" placeholder="Search SKU, style, store..." />
+      <div class="table-wrap table-wrap--scroll-y table-wrap--spaced">
+        <table class="report-table" id="refillTable">
+          <thead id="refillTableHead"></thead>
+          <tbody id="refillTableBody"></tbody>
+        </table>
+      </div>
+      <button class="export-btn" data-export-table="refillTable" data-export-filename="refill-list">&#8595; Export CSV</button>
+    </section>
+
+    <!-- ============================ Refill Logic ============================ -->
+    <section class="page-panel" id="logicPanel">
+      <div class="logic-box">
+        <h2 class="logic-box-title">REFILL LOGIC</h2>
+        <div class="logic-box-columns">
+          <ol class="logic-list">
+            <li>SKU must have sold at least once at the same store, ever (full sales history, no date cutoff).</li>
+            <li>Sales Window filter (top bar) toggles the whole dashboard between Last 90 Days and Overall (all-time); defaults to Last 90 Days.</li>
+            <li>Fulfillment is RTS only.</li>
+            <li>Gold Coin, Silver Coin, and Silver jewelry (by item_group_name or metal) are excluded from all sales figures.</li>
+            <li>Customize-order styles are excluded: COR, COE, COP/COPD, COB, COC, CNP, CTN, CNK prefixes (not real stock, made to order).</li>
+            <li>Exact SKU must currently have 0 stock at that store.</li>
+            <li>If a transfer into that store for that exact SKU is dated AFTER the last sale, the stock has already been sent: the row is marked IN TRANSIT (with the transfer document and unit count) and hidden by default, because the stock ledger doesn't show it at the store yet. Tick "Show rows already sent to the store" to see them. This relies on the ERP transfer record (stock_in_Store); if the units are never received, the row stays marked until they appear in stock.</li>
+            <li>Store Stock and HO On Hand count only location "Finish Goods" &mdash; Repair, Vendor Return, Melting Stock, and similar non-sellable locations are excluded.</li>
+            <li>SKU is matched by exact SKU + Size + Metal/Variant.</li>
+            <li>Store sales are based on Billing Company (company_code), not Location.</li>
+            <li>Reorder quantity is always 1.</li>
+            <li>HO On Hand shows exact SKU stock at Head Office.</li>
+            <li>Ageing = Last Sold Date &minus; Transfer Date (the transfer that brought that stock into the selling store, from stock_in_Store).</li>
+            <li>Sales Cycle is Below 180 (&le;180 days) or Above 180 (&gt;180 days); Unknown when no qualifying transfer record exists.</li>
+            <li>PO is valid only when PO Raised Date &gt; Last Sold Date. PO validity is SKU-level only &mdash; no store-level PO linkage exists in source data.</li>
+            <li>Old POs (raised before the last sale) are ignored.</li>
+            <li>Network and Peer Store Availability are matched at the style level (any size/metal variant of the same style counts), not exact SKU.</li>
+            <li>Network Availability requires &ge;2 units at a location.</li>
+            <li>Single-unit locations are excluded from Network Availability.</li>
+            <li>HO, HWI Ventures, and the selling store itself are excluded from Peer Store Availability.</li>
+            <li>Network/Peer Availability is shown as City-Qty(AgeingDays), e.g. "Borivali-1(254)" &mdash; city/area name, not the store code.</li>
+            <li>Peer stock aged &gt;180 days is highlighted RED (oldest unit at that store).</li>
+            <li>Lifetime Sales is shown only when at least one peer stock is &gt;180 days old.</li>
+            <li>Lifetime Sales is Store + Style level and includes all sizes/metals/variants.</li>
+            <li>Lifetime Sales of 1&ndash;2 is GREEN.</li>
+            <li>Transfer Candidate additionally requires that red-flagged peer to hold &ge;2 units.</li>
+            <li>T-1 compares today's list with the previous run.</li>
+            <li>Product image is matched by SKU from Shopify's own catalog where available.</li>
+          </ol>
+          <div class="logic-flow">
+            <div class="logic-flow-step">SOLD AT LEAST ONCE, EVER (RTS ONLY)</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">EXCLUDE COINS, SILVER, CUSTOMIZE-ORDER STYLES</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CURRENT STOCK = 0</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK HO</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK VALID PO</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK NETWORK STOCK</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK PEER STOCK</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK AGEING &gt;180</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">CHECK LIFETIME STYLE SALES</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">TRANSFER OPPORTUNITY</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="refill-management.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploy: Render dashboard -> New -> Blueprint -> select this repo.
+# Render reads this file and creates the service below automatically,
+# including the name (so the URL becomes lucirareffiling.onrender.com).
+#
+# Every env var below has sync: false, meaning Render will prompt you to
+# paste each value in during setup rather than storing them in this file —
+# nothing secret lives in this repo.
+services:
+  - type: web
+    name: lucirareffiling
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ZOHO_CLIENT_ID
+        sync: false
+      - key: ZOHO_CLIENT_SECRET
+        sync: false
+      - key: ZOHO_REFRESH_TOKEN
+        sync: false
+      - key: ZOHO_DOMAIN
+        sync: false
+      - key: ZOHO_MOBILE_FIELD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DASHBOARD_USERNAME
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        sync: false

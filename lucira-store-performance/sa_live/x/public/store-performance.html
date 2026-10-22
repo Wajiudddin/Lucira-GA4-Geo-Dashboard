@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Store Performance Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="store-performance-style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+  <div class="viz-root sp-root">
+    <header class="sp-header">
+      <div class="sp-header-titles">
+        <div class="sp-brand-eyebrow">LUCIRA JEWELRY</div>
+        <h1>Store Performance</h1>
+        <p class="sp-subtitle">Store Performance &amp; Customer Journey Analytics</p>
+      </div>
+      <div class="sp-header-right">
+        <nav class="sp-nav" id="mainNav">
+          <button type="button" class="sp-nav-link is-active" data-tab="dashboard">Dashboard</button>
+          <button type="button" class="sp-nav-link" data-tab="compare">Store Comparison</button>
+          <button type="button" class="sp-nav-link" data-tab="city">City Wise</button>
+          <button type="button" class="sp-nav-link" data-tab="logic">Logic</button>
+        </nav>
+        <div class="sp-header-actions">
+          <span id="updatedAt" class="sp-updated-at"><span class="sp-status-dot" aria-hidden="true"></span><span id="updatedAtText"></span></span>
+          <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+          <button id="refreshBtn" class="sp-refresh-btn" type="button">Refresh</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="dashboardTab">
+      <div id="freshnessBanner" class="freshness-banner" hidden></div>
+      <div id="statusBar" class="status-bar" hidden></div>
+
+      <div class="sp-filterbar" id="controlsWrap" hidden>
+        <div class="sp-control">
+          <label class="sp-control-label" id="storeMultiSelectLabel">Store</label>
+          <div class="sp-multiselect" id="storeMultiSelect">
+            <button type="button" class="sp-select sp-multiselect-trigger" id="storeMultiSelectTrigger"
+              aria-haspopup="listbox" aria-expanded="false" aria-labelledby="storeMultiSelectLabel"></button>
+            <div class="sp-multiselect-panel" id="storeMultiSelectPanel" role="listbox" aria-multiselectable="true" hidden></div>
+          </div>
+        </div>
+        <div class="sp-control">
+          <label class="sp-control-label" for="periodToggle">Period</label>
+          <div class="sp-segmented" id="periodToggle" role="tablist" aria-label="Comparison period"></div>
+        </div>
+        <div class="sp-control sp-custom-range" id="customRange" hidden></div>
+        <div class="sp-period-dates" id="periodDates"></div>
+      </div>
+
+      <div id="skeletonWrap" class="sp-skeleton" hidden>
+        <div class="sp-skeleton-cards">
+          <div class="sp-skeleton-card"></div>
+          <div class="sp-skeleton-card"></div>
+          <div class="sp-skeleton-card"></div>
+          <div class="sp-skeleton-card"></div>
+        </div>
+        <div class="sp-skeleton-band"></div>
+        <div class="sp-skeleton-row"></div>
+        <div class="sp-skeleton-row"></div>
+        <div class="sp-skeleton-row"></div>
+        <div class="sp-skeleton-row"></div>
+        <div class="sp-skeleton-row"></div>
+      </div>
+
+      <div id="content"></div>
+    </div>
+
+    <div id="logicTab" hidden>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">How to read this page</h2>
+          <p class="sp-section-desc">A quick guide. The details are further down.</p>
+        </div>
+        <ul class="logic-list">
+          <li><strong>Dashboard tab:</strong> headline cards, charts, and one table with every metric for Yesterday, Last Week and Last Month. Use the Store filter to look at one store, several, or all.</li>
+          <li><strong>Store Comparison tab:</strong> stores down the side, 28 columns across: Inventory, Sq Ft, Number of Staff, Walkins (total, new, repeat), Meetings Raised, Customers (total, new, repeat), Orders, Online Influenced Orders, Qty, Revenue, Purchase Cost, Margin, Margin %, ATV, New and Repeat Revenue, New and Repeat ATV, Revenue Per Staff, Margin / Sq Ft, Scans, Scans Per Walkin, Google Rating and Reviews. Click a heading to rank the stores, or an <strong>Orders</strong> number to open the bills behind it.</li>
+          <li><strong>City Wise tab:</strong> one row per city (Mumbai, Pune, Delhi, Bangalore) with its number of stores, City Sessions, City Deals, Meetings Raised, Visited From Meetings, Order Conversion, Spend and the three cost figures. A city is the sum of its stores: Mumbai is Borivali and Chembur, Delhi is Paschim Vihar, Lajpat Nagar and Noida, Bangalore is Malleshwaram.</li>
+          <li><strong>Each tab has its own filters.</strong> The period, custom dates and store choice you set on one tab do not change the other tabs.</li>
+          <li><strong>Freshness:</strong> data is loaded when you open the page and kept for 15 minutes. Press <strong>Refresh</strong> to reload. If one source is down, only the metrics that use it show "Data unavailable".</li>
+        </ul>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">Periods</h2>
+          <p class="sp-section-desc">All dates are India time.</p>
+        </div>
+        <div class="table-wrap">
+          <table class="report-table logic-table">
+            <thead><tr><th>Period</th><th>Dates</th><th>Dashboard tab shows</th><th>Store Comparison and City Wise show</th></tr></thead>
+            <tbody>
+              <tr><td>Today</td><td>The day so far</td><td>Not available</td><td>Today's figures, which fill in during the day (Store Comparison only)</td></tr>
+              <tr><td>Yesterday</td><td>The day before today</td><td>That day</td><td>That day</td></tr>
+              <tr><td>Last Week</td><td>Last full Monday to Sunday</td><td><strong>Average per day</strong></td><td><strong>Full totals</strong> for the week</td></tr>
+              <tr><td>Last Month</td><td>Last full calendar month</td><td><strong>Average per day</strong></td><td><strong>Full totals</strong> for the month</td></tr>
+              <tr><td>Custom</td><td>Dashboard: up to 92 days, within the last 120 days. The other two tabs: any range from 13 Sep 2025 (the start of the data). Always ending no later than yesterday.</td><td>Totals by default, or per-day average if you choose it</td><td>Full totals for the range</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="logic-p logic-note">
+          Website sessions for "Yesterday" are for the day before yesterday, because Google Analytics finishes a day later (the heading says "As of").
+          Not averaged anywhere: <strong>Inventory, Number of Staff</strong> and the Google rating and reviews are "right now" values. Ratios
+          (Cost Per&hellip;, ATV, Scans Per Visitor, percentages) are always worked out from the real totals.
+        </p>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">Rules that change the numbers</h2>
+          <p class="sp-section-desc">The decisions worth knowing before you compare figures.</p>
+        </div>
+        <ul class="logic-list">
+          <li><strong>Free items are ignored.</strong> A bill whose total net sale is ₹0 is not an order. An item with a net sale of ₹0 (for example a free gold coin on a paid bill) is not counted in Qty, Purchase, Sales Amount or Margin either. Cancelled bills still count as orders; they are marked in red in the bill list.</li>
+          <li><strong>Made-to-order (MTO) pieces.</strong> On the Store Comparison tab an MTO piece counts only once it is <strong>billed</strong>: on the day its final RTS bill was made, at the RTS bill amount (the price can change between order and bill). Pre-order (RPO) bills are not counted there. The Dashboard tab still counts the pre-order bill.</li>
+          <li><strong>Walk-ins</strong> come from the ERP walk-in log (<code>Lucira_Prod.customer_walkin</code>, rows marked "Store Walkin"; its bill, receipt and enquiry entries are not visits). A person with a valid mobile counts once per store per day.</li>
+          <li><strong>Mumbai and Delhi sessions are shared.</strong> Website sessions can't tell Borivali from Chembur, or Paschim Vihar from Lajpat Nagar, so each pair gets half of its city's sessions. In City Wise the halves add back to the city total, and Delhi includes Noida.</li>
+          <li><strong>Deals are an estimate.</strong> Zoho deals have no store, so each deal goes to a store by the customer's city: Mumbai is split 50/50 between Borivali and Chembur; Central, South and South West Delhi go to Lajpat Nagar; North, North West and West Delhi to Paschim Vihar; East Delhi and Noida to Noida.</li>
+          <li><strong>Margin = Sales Amount &minus; Purchase Amount</strong> (net sale is not used), only for items that have both. Sales Amount is the POS invoice amount after discount.</li>
+          <li><strong>Purchase cost is looked up in this order:</strong> the purchase invoice (GRN), then the consignment-in (APU), then, if the piece was sold under a different item line number than it was bought under (for example an MTO piece), the same lookup under the line number of the stock piece allocated to it. The Orders pop-up shows the GRN or APU number and both line numbers.</li>
+          <li><strong>Fixed values:</strong> Number of Staff and store area (sq ft) are set by the business, not read from a system. Chembur 5 staff / 650 sq ft, Borivali 5 / 513, Pune 7 / 1,500, Paschim Vihar 4 / 1,184, Noida 6 / 1,600, Lajpat Nagar 5 / 690, Malleshwaram 5 / 1,350.</li>
+          <li><strong>Spend is partial.</strong> Only ad campaigns whose name contains a store or city are counted. Pan-India campaigns are left out, so the cost figures are lower-bound estimates.</li>
+        </ul>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">Where the data comes from</h2>
+        </div>
+        <div class="table-wrap"><table class="report-table logic-table"><tbody>
+          <tr><td>Website sessions</td><td><code>ds_imputed_reporting.ga4_city_sessions_daily</code>, a daily summary of the GA4 export, refreshed every 12 hours (the last 4 days are rebuilt each time).</td></tr>
+          <tr><td>Deals, Meetings, Calls</td><td>Zoho CRM, read live.</td></tr>
+          <tr><td>Walk-ins</td><td><code>Lucira_Prod.customer_walkin</code> (Store Walkin rows).</td></tr>
+          <tr><td>Orders, Revenue, New / Repeat</td><td><code>ds_imputed_reporting.marketing_sale</code> (in-store bills), plus <code>MTO_Orders</code> for billed made-to-order pieces.</td></tr>
+          <tr><td>Sales Amount</td><td>The ERP POS invoice lines, matched to each piece by item line number.</td></tr>
+          <tr><td>Purchase Amount</td><td><code>purchase.invoice_items</code> (GRN), else <code>purchase.consignment_items</code> (APU), else the allocated stock piece's line.</td></tr>
+          <tr><td>Scans</td><td><code>Pos.estimation_item_scan</code>.</td></tr>
+          <tr><td>Inventory</td><td><code>ds_imputed_reporting.Live_inventory</code>.</td></tr>
+          <tr><td>Spend</td><td><code>ds_imputed_reporting.ads_spend_live_city_daily</code> (Google Ads and Meta Ads together).</td></tr>
+          <tr><td>Google rating, reviews, clicks</td><td>Google Business Profile, read live.</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">Metrics in plain words</h2>
+        </div>
+
+        <h3 class="logic-h3">Website traffic</h3>
+        <div class="table-wrap"><table class="report-table logic-table"><tbody>
+          <tr><td>City Sessions</td><td>All website visits from the city (a visit = one user's session). Counted for Mumbai, Delhi, Pune, Noida and Bengaluru only.</td></tr>
+          <tr><td>Paid Sessions</td><td>Visits from Google ads (source Google, not organic) or Facebook / Instagram ads.</td></tr>
+          <tr><td>Retargeting Sessions</td><td>Visits from retargeting ads (Criteo / RTB).</td></tr>
+          <tr><td>Communication Sessions</td><td>Visits from our own WhatsApp, push, SMS or email messages. Not part of Paid.</td></tr>
+        </tbody></table></div>
+        <p class="logic-p logic-note">The three channels do not add up to City Sessions. The rest is organic search, direct visits with no source, other referral sites and ad sources the Paid rule does not cover.</p>
+
+        <h3 class="logic-h3">Leads and store visits</h3>
+        <div class="table-wrap"><table class="report-table logic-table"><tbody>
+          <tr><td>Deals</td><td>Deals created in Zoho, given to a store by the customer's city (see the rules above).</td></tr>
+          <tr><td>Meetings Raised</td><td>Meetings created in Zoho, counted on the day they were raised. The store is the meeting owner's store, or the one named in the Venue. A blank Venue counts in All Stores only; non-store venues (HO, Video Call) are ignored.</td></tr>
+          <tr><td>Visited From Meetings (City Wise)</td><td>Of the meetings raised in the period, the ones where the customer came to the store. From 22 Sep 2026 this is the <em>Show</em> mark the store team sets on the meeting in Zoho. For earlier meetings, a store visit by the same phone number after the meeting was raised counts.</td></tr>
+          <tr><td>Order Conversion (City Wise)</td><td>Of the meetings raised in the period, the ones that turned into an order, shown with the share of Meetings Raised. From 22 Sep 2026 this is the <em>Converted</em> mark in Zoho. For earlier meetings, a bill by the visiting customer on the visit day or later counts.</td></tr>
+          <tr><td>Walkins</td><td>Store visits, on the day they happened. Malleshwaram has none recorded.</td></tr>
+          <tr><td>New / Repeat Walkins</td><td>A phone number's first visit in the log (which starts Oct 2025) is New; every later visit is Repeat. A visit with no phone number counts as New.</td></tr>
+          <tr><td>Walkins From Meetings (Dashboard tab)</td><td>Store visits by customers who had a meeting raised before the visit, matched by phone number, counted once on the visit day.</td></tr>
+        </tbody></table></div>
+
+        <h3 class="logic-h3">Sales</h3>
+        <div class="table-wrap"><table class="report-table logic-table"><tbody>
+          <tr><td>Orders</td><td>In-store bills (online orders excluded). Click the number on the Store Comparison tab to see every bill, piece by piece.</td></tr>
+          <tr><td>Online Influenced Orders / %</td><td>Orders where the buyer already had a Zoho deal, or had signed up on the website (email "subscribed"), before the order. The % is that count divided by Orders. Matched on mobile number or email.</td></tr>
+          <tr><td>Revenue</td><td>Dashboard tab: net sale of the bills. Store Comparison tab: the Sales Amount (see Margin below), so it can be lower than the real net sale.</td></tr>
+          <tr><td>Qty</td><td>Pieces sold.</td></tr>
+          <tr><td>Customers, New / Repeat</td><td>Different customers who bought, split by the sales record's New / Repeat tag. Customers = New + Repeat. A customer buying on two days counts on each.</td></tr>
+          <tr><td>New / Repeat Revenue</td><td>Revenue split the same way.</td></tr>
+          <tr><td>ATV, New / Repeat ATV</td><td>Average value of a bill: Revenue divided by Orders (New ATV by New Orders, Repeat ATV by Repeat Orders).</td></tr>
+        </tbody></table></div>
+
+        <h3 class="logic-h3">Margin</h3>
+        <div class="table-wrap"><table class="report-table logic-table"><tbody>
+          <tr><td>Sales Amount</td><td>What the pieces were billed for after discount (POS invoice amount less discount).</td></tr>
+          <tr><td>Purchase Amount</td><td>What the same pieces cost, from the purchase invoice, consignment or allocated stock piece (see the rules above).</td></tr>
+          <tr><td>Margin</td><td>Sales Amount minus Purchase Amount.</td></tr>
+          <tr><td>Margin %</td><td>Margin divided by Sales Amount of the same pieces.</td></tr>
+          <tr><td>Margin / Sq Ft</td><td>Margin divided by the store's area. All Stores uses the area of the stores that have margin data (Malleshwaram has none).</td></tr>
+        </tbody></table></div>
+        <p class="logic-p logic-note">Pre-order bills and brand-new items often have no purchase record yet, so their Margin shows "&mdash;" until they do.</p>
+
+        <h3 class="logic-h3">In-store scans</h3>
+        <div class="table-wrap"><table class="report-table logic-table"><tbody>
+          <tr><td>Scans</td><td>Items scanned on the POS, per store per day. About 90% of all scans are at Pune, so a low number elsewhere usually means "not scanned", not "no interest".</td></tr>
+          <tr><td>Scans Per Visitor / Scans Per Walkin</td><td>Scans divided by Walkins (visits), so someone who visits twice counts twice.</td></tr>
+        </tbody></table></div>
+
+        <h3 class="logic-h3">Calls (Dashboard tab)</h3>
+        <div class="table-wrap"><table class="report-table logic-table"><tbody>
+          <tr><td>Store Calls Dialed</td><td>Outbound calls made by the store's team.</td></tr>
+          <tr><td>Connected Calls / over 30 Seconds</td><td>Calls that were answered, and those that lasted over 30 seconds.</td></tr>
+          <tr><td>Store Talktime</td><td>Total time on connected calls.</td></tr>
+        </tbody></table></div>
+
+        <h3 class="logic-h3">Google Business Profile</h3>
+        <div class="table-wrap"><table class="report-table logic-table"><tbody>
+          <tr><td>GMB Strength, Google Reviews, Google Rating</td><td>How complete the listing is, and its total reviews and average star rating (current values).</td></tr>
+          <tr><td>Store Direction Clicks / Store Calls Clicked</td><td>Taps on "Directions" and "Call" on the store's Google listing. Google reports these about 2&ndash;3 days late. Malleshwaram shows N/A until Google finishes verifying its listing.</td></tr>
+        </tbody></table></div>
+
+        <h3 class="logic-h3">Store operations</h3>
+        <div class="table-wrap"><table class="report-table logic-table"><tbody>
+          <tr><td>Inventory</td><td>Pieces in finished-goods stock at the store right now.</td></tr>
+          <tr><td>Number of Staff</td><td>Fixed headcount from the store config. All Stores is the sum.</td></tr>
+          <tr><td>Revenue Per Staff</td><td>Revenue divided by the store's staff. All Stores uses the staff of the stores that have revenue data (Malleshwaram has none).</td></tr>
+        </tbody></table></div>
+
+        <h3 class="logic-h3">Marketing efficiency</h3>
+        <div class="table-wrap"><table class="report-table logic-table"><tbody>
+          <tr><td>Spend</td><td>Google Ads plus Meta Ads spend for campaigns that name the store or city. A campaign naming several stores is shared equally; one naming only "Mumbai" or "Delhi" is shared between that city's stores.</td></tr>
+          <tr><td>Cost Per Session / Deal / Appointment</td><td>Spend divided by City Sessions, Deals and Meetings Raised. Because Spend is partial, these are lower-bound estimates.</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">Which store does a number belong to?</h2>
+        </div>
+        <ul class="logic-list">
+          <li><strong>Sales, orders, revenue, margin:</strong> the store code on the sales record.</li>
+          <li><strong>Walkins:</strong> the store the visit was logged at. <strong>Scans:</strong> the store of the scan.</li>
+          <li><strong>Meetings, calls:</strong> the owner's store; for meetings, the Venue text if the owner is a central account.</li>
+          <li><strong>Deals, website sessions:</strong> the customer's or visitor's city (Mumbai and Delhi shared between stores).</li>
+          <li><strong>Spend:</strong> store or city words in the campaign name.</li>
+        </ul>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">Good to know</h2>
+        </div>
+        <ul class="logic-list">
+          <li>With only some stores selected, ratio columns are worked out from the figures on screen, so they can be a point or two off for very small numbers. All Stores and a single store are exact.</li>
+          <li>Malleshwaram has no sales, walk-in or scan records, so those metrics show N/A for it.</li>
+          <li>Meeting Show and Converted marks in Zoho only started being filled in around 22 Sep 2026; meetings before that use the phone-number matching described above.</li>
+          <li>The Dashboard tab's table keeps the original metric list. The newer metrics are on the Store Comparison and City Wise tabs.</li>
+          <li>In the bill list, phone numbers are not shown.</li>
+        </ul>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="store-performance.js"></script>
+</body>
+</html>

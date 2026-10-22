@@ -1,0 +1,13 @@
+{
+  "name": "lucira-city-funnel",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@google-cloud/bigquery": "^7.9.0",
+    "express": "^4.19.2",
+    "express-basic-auth": "^1.2.1"
+  }
+}

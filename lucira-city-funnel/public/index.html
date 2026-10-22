@@ -1,0 +1,528 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>City Funnel Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap">
+<style>
+/* Theme: Lucira Refill look. Blush page, white cards with a gold top edge, rose-mauve accent, pill controls, Playfair headings on Quicksand. */
+:root{
+  --bg:#fbf4f3; --surface:#fffdfc; --surface-2:#f8eeec; --line:rgba(36,26,24,.12); --grid:#f0e3e0;
+  --ink:#241a18; --ink-2:#6e5b58; --ink-3:#a38f8b; --accent:#96625e; --accent-ink:#ffffff; --accent-soft:#f3e4e1; --gold:#d4af37; --shadow:rgba(36,26,24,.09);
+  --good:#6e8f52; --warn:#7a5a0c; --warn-bg:#fbf0cf; --bad:#b0403d; --bad-bg:#f9e3e1;
+  --c-mumbai:#2a78d6; --c-delhi:#eb6834; --c-pune:#1baf7a; --c-noida:#eda100; --c-blr:#e87ba4; --c-hyd:#008300; --c-other:#4a3aa7; --c-unknown:#8a93a0;
+  --f-display:'Playfair Display',Georgia,serif; --f-body:'Quicksand',system-ui,-apple-system,'Segoe UI',sans-serif; --f-num:'Quicksand',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1c1514; --surface:#251c1a; --surface-2:#2c2220; --line:rgba(247,236,233,.12); --grid:#372a28;
+  --ink:#f7ece9; --ink-2:#cbb6b2; --ink-3:#957f7b; --accent:#bf8983; --accent-ink:#1c1514; --accent-soft:#3a2a28; --gold:#e3c165; --shadow:rgba(0,0,0,.35);
+  --good:#8fb36c; --warn:#e3c165; --warn-bg:#3a3016; --bad:#e08a82; --bad-bg:#3d1e1b;
+  --c-mumbai:#3987e5; --c-delhi:#d95926; --c-pune:#199e70; --c-noida:#c98500; --c-blr:#d55181; --c-hyd:#2fa32f; --c-other:#9085e9; --c-unknown:#8793a2; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#1c1514; --surface:#251c1a; --surface-2:#2c2220; --line:rgba(247,236,233,.12); --grid:#372a28;
+  --ink:#f7ece9; --ink-2:#cbb6b2; --ink-3:#957f7b; --accent:#bf8983; --accent-ink:#1c1514; --accent-soft:#3a2a28; --gold:#e3c165; --shadow:rgba(0,0,0,.35);
+  --good:#8fb36c; --warn:#e3c165; --warn-bg:#3a3016; --bad:#e08a82; --bad-bg:#3d1e1b;
+  --c-mumbai:#3987e5; --c-delhi:#d95926; --c-pune:#199e70; --c-noida:#c98500; --c-blr:#d55181; --c-hyd:#2fa32f; --c-other:#9085e9; --c-unknown:#8793a2; color-scheme:dark;}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;padding-inline:16px}
+.wrap{max-width:1280px;margin:0 auto;padding-block:20px 48px;display:flex;flex-direction:column;gap:20px}
+h1{font-family:var(--f-display);font-weight:600;font-size:26px;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:13px;font-weight:600;margin:0;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.sub{color:var(--ink-3);font-size:12px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.top{display:flex;gap:12px 24px;justify-content:space-between;align-items:flex-end;flex-wrap:wrap}
+.range{font-family:var(--f-num);font-size:13px;color:var(--ink);background:var(--accent-soft);padding:4px 10px;border-radius:6px;display:inline-block;margin-top:6px}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.bar .l{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;display:flex;flex-direction:column;gap:3px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface-2)}
+.seg button{background:transparent;color:var(--ink-2);border:0;border-radius:0;padding:6px 12px;min-height:32px;font-weight:500;text-transform:none;letter-spacing:0;font-size:13px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+select,input[type=date],button,summary{font:inherit;color:var(--ink)}
+select,input[type=date]{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-height:32px}
+button{cursor:pointer;background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:7px 14px;font-weight:500;min-height:32px}
+button.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+details.ms{position:relative}
+details.ms>summary{list-style:none;cursor:pointer;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;min-height:32px;display:flex;gap:6px;align-items:center;white-space:nowrap}
+details.ms>summary::-webkit-details-marker{display:none}
+details.ms>summary b{font-weight:500;color:var(--accent)}
+details.ms .pop{position:absolute;z-index:30;top:38px;left:0;min-width:200px;max-height:300px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+details.ms .pop label{display:flex;gap:8px;align-items:center;padding:5px 6px;border-radius:4px;cursor:pointer}
+details.ms .pop label:hover{background:var(--surface-2)}
+.notice{border-radius:8px;padding:9px 12px;font-size:13px;background:var(--warn-bg);color:var(--warn);display:flex;gap:8px;flex-wrap:wrap}
+.notice.err{background:var(--bad-bg);color:var(--bad)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.kpi .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+.kpi .v{font-family:var(--f-num);font-size:26px;font-weight:500;margin-top:4px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi .d{font-size:12px;color:var(--ink-2);margin-top:2px;min-height:17px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.card>header{display:flex;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;align-items:baseline;margin-bottom:12px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-2)}
+.legend i,.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.legend button.lg{background:none;color:inherit;padding:0;min-height:0;font-weight:400;display:inline-flex;align-items:center}
+.legend button.off{opacity:.4;text-decoration:line-through}
+/* funnel */
+.stage{display:grid;grid-template-columns:150px 150px 1fr;gap:8px 16px;align-items:center;padding:12px 0;border-top:1px solid var(--grid)}
+.stage:first-of-type{border-top:0}
+.stage .nm{font-weight:600}
+.stage .nm small{display:block;font-weight:400;color:var(--ink-3);font-size:11px}
+.stage .val{font-family:var(--f-num);font-size:22px;font-variant-numeric:tabular-nums}
+.stage .cv{font-size:12px;color:var(--ink-2)}
+.stage .cv b{color:var(--accent);font-family:var(--f-num);font-weight:500;font-size:14px}
+.comp{display:flex;gap:2px;height:22px;width:100%}
+.comp span{display:block;border-radius:3px;min-width:2px}
+.comp .e{flex:1;background:var(--grid);border-radius:3px}
+.hint{font-size:11px;color:var(--ink-3);margin-top:4px}
+/* leaders */
+.leaders{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.leader{background:var(--surface-2);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--ink-2)}
+.leader b{display:block;font-size:15px;color:var(--ink);font-weight:600}
+/* small multiples */
+.sm{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.sm h3{margin:0 0 8px;font-size:13px;font-weight:600}
+.hb{display:grid;grid-template-columns:92px 1fr auto;gap:6px 8px;align-items:center;font-size:12px}
+.hb .cn{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb .tr{height:10px;background:var(--grid);border-radius:0 5px 5px 0;position:relative}
+.hb .fl{position:absolute;inset:0 auto 0 0;border-radius:0 5px 5px 0;min-width:2px}
+.hb .vl{font-family:var(--f-num);font-variant-numeric:tabular-nums;color:var(--ink)}
+.sbars{display:grid;grid-template-columns:minmax(90px,150px) 1fr auto;gap:10px 12px;align-items:center;font-size:13px}
+.sbars .nm{color:var(--ink-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbars .tr{height:14px;background:var(--grid);border-radius:7px;position:relative;overflow:hidden}
+.sbars .fl{position:absolute;inset:0 auto 0 0;border-radius:7px;min-width:3px}
+.sbars .vl{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-weight:500;min-width:64px;text-align:right}
+#scMetric{min-width:150px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
+/* table */
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:1080px;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:500;text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;background:var(--surface)}
+th:first-child,td:first-child{text-align:left}
+td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--grid);font-family:var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+td:first-child{font-family:var(--f-body);font-weight:500}
+td small{color:var(--ink-3);font-size:11px;margin-left:4px}
+tr.grp td{font-weight:600;background:var(--surface-2)}
+tr.child td:first-child{padding-left:28px;font-weight:400;color:var(--ink-2)}
+.sub-note{font-family:var(--f-body);font-size:11px;color:var(--ink-3)}
+tr.tot td{font-weight:600;border-top:2px solid var(--line);background:var(--surface-2)}
+th.s::after{content:" ↓";color:var(--accent)} th.s.asc::after{content:" ↑"}
+/* trend */
+#trend{width:100%;height:auto;display:block}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tabs button{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line);padding:4px 10px;min-height:28px;font-size:12px}
+.tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#tip{position:fixed;z-index:50;pointer-events:none;background:var(--ink);color:var(--bg);padding:7px 10px;border-radius:6px;font-size:12px;max-width:260px;opacity:0;transition:opacity .08s}
+#tip div{display:flex;justify-content:space-between;gap:14px;font-family:var(--f-num)}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.navtabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.navtabs button{background:transparent;color:var(--ink-2);border-radius:6px 6px 0 0;padding:8px 16px;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.navtabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+.logic h3{font-size:14px;margin:18px 0 6px}
+.logic ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;max-width:95ch;color:var(--ink-2)}
+.logic code{font-family:var(--f-num);font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+details.defs{font-size:13px;color:var(--ink-2)}
+details.defs summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details.defs ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;max-width:90ch}
+.loading .kpi .v,.loading .val{opacity:.35}
+@media(max-width:720px){.stage{grid-template-columns:1fr 1fr}.stage .comp{grid-column:1/-1}.hb{grid-template-columns:80px 1fr auto}h1{font-size:22px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---- Lucira refill theme ---- */
+h1{font-family:var(--f-display);font-size:21px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding-bottom:10px;border-bottom:3px solid var(--gold);display:inline-block;margin-bottom:6px}
+h2{font-family:var(--f-body);color:var(--ink);letter-spacing:.05em}
+.sub{color:var(--ink-2)}
+.kpi,.card,.bar{border-radius:14px;box-shadow:0 2px 10px var(--shadow);border-color:var(--line)}
+.kpi{border-top:3px solid var(--gold)}
+.kpi .v{color:var(--accent);font-weight:600}
+.kpi .k{color:var(--ink-3)}
+.card{border-top:3px solid var(--accent)}
+button{border-radius:999px;font-family:inherit}
+.pill{padding:8px 16px;box-shadow:0 1px 2px var(--shadow)}
+button.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.topr{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.seg{border:0;background:transparent;gap:6px;border-radius:0;overflow:visible}
+.seg button{border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);padding:7px 14px;font-weight:600}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button:hover{border-color:var(--accent)}
+.seg button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+select,input[type=date]{background:var(--surface);border-radius:8px;border-color:var(--line)}
+details.ms>summary{background:var(--surface);border-radius:8px}
+details.ms .pop{background:var(--surface);border-radius:12px;box-shadow:0 4px 18px var(--shadow)}
+.navtabs{border-bottom:1px solid var(--line)}
+.navtabs button{color:var(--ink-2);font-weight:600}
+.navtabs button.on{color:var(--ink);font-weight:700;border-bottom:3px solid var(--gold)}
+.range{background:var(--accent-soft);color:var(--ink)}
+tr.tot td{border-top:2px solid var(--gold);background:var(--surface-2)}
+th{color:var(--ink-3)}
+.sbars .tr{background:var(--grid)}
+.logic h3{color:var(--accent)}
+.logic code{background:var(--surface-2)}
+
+/* ---- pastel store bars (match the Refill charts) ---- */
+:root{--s-1:#c98b5f; --s-2:#6fa98c; --s-3:#d6a64b; --s-4:#cb8fa5; --s-5:#7d9b5c; --s-6:#8a80bc; --s-7:#6e8fb5;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--s-1:#d89c72; --s-2:#82bb9e; --s-3:#e3b85f; --s-4:#d9a2b7; --s-5:#90b06f; --s-6:#9d94cc; --s-7:#82a3c8;}}
+:root[data-theme="dark"]{--s-1:#d89c72; --s-2:#82bb9e; --s-3:#e3b85f; --s-4:#d9a2b7; --s-5:#90b06f; --s-6:#9d94cc; --s-7:#82a3c8;}
+.sbars{grid-template-columns:minmax(96px,150px) 1fr;gap:12px 14px}
+.sbars .nm{color:var(--ink-2);font-weight:500}
+.sbars .tr{display:flex;align-items:center;gap:10px;height:22px;background:transparent;border-radius:0;overflow:visible;position:static}
+.sbars .fl{position:static;flex:none;height:18px;border-radius:999px;min-width:8px;inset:auto}
+.sbars .vl{min-width:0;text-align:left;font-weight:600;font-size:13px;color:var(--ink)}
+</style></head><body>
+
+<div class="wrap" id="root">
+  <div class="top">
+    <div>
+      <h1>City Funnel &amp; Sales Performance</h1>
+      <div class="sub">Lucira Jewelry · Sessions → Deals → Store Visit Raised → Store Visited → Orders → Revenue · live from BigQuery</div>
+      <div class="range" id="rangeLbl">…</div>
+    </div>
+    <div class="topr"><span class="sub" id="status" aria-live="polite">Loading…</span><button type="button" class="pill ghost" id="themeBtn">Dark</button><button type="button" class="pill" id="refreshBtn">Refresh</button></div>
+  </div>
+
+  <div class="navtabs" role="tablist"><button type="button" class="on" data-tab="pDash" role="tab">Dashboard</button><button type="button" data-tab="pLogic" role="tab">Logic</button></div>
+  <div class="stack" id="pDash">
+  <div class="bar" id="bar">
+    <div class="l">Date range<div class="seg" id="preset" role="group" aria-label="Date range"><button type="button" data-p="today">Today</button><button type="button" data-p="yesterday">Yesterday</button><button type="button" data-p="last7">Last 7d</button><button type="button" data-p="last30">Last 30d</button><button type="button" data-p="all">All data</button><button type="button" data-p="custom">Custom</button></div></div>
+    <label class="l" id="cfrom" hidden>From<input type="date" id="dfrom"></label>
+    <label class="l" id="cto" hidden>To<input type="date" id="dto"></label>
+    <div id="msHost" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end"></div>
+    <label class="l">Order status
+      <select id="status_f"><option value="active">Active (excl. cancelled)</option><option value="all">All</option><option value="cancelled">Cancelled only</option></select></label>
+    <button id="apply">Apply</button>
+    <button class="ghost" id="reset">Reset</button>
+  </div>
+
+  <div id="notices" style="display:flex;flex-direction:column;gap:8px"></div>
+  <div class="kpis" id="kpis"></div>
+
+  <section class="card"><header><div><h2>Store comparison</h2><div class="sub" id="scSub"></div></div>
+    <select id="scMetric" aria-label="Metric"><option value="sessions">Sessions</option><option value="deals">Deals</option><option value="raised">Store Visit Raised</option><option value="visited">Store Visited</option><option value="orders">Orders</option><option value="revenue">Revenue</option></select></header>
+    <div class="sbars" id="scBars"></div><div class="hint" id="scHint"></div></section>
+
+  <section class="card"><header><h2>Store-wise detail</h2></header><div class="tw"><table id="tblStore"></table></div></section>
+
+  </div>
+  <div class="stack" id="pLogic" hidden>
+    <section class="card logic"><header><h2>How every number is calculated</h2><span class="sub">Everything comes live from BigQuery for the date range chosen on the Dashboard tab. Nothing is typed in by hand.</span></header>
+
+      <h3>Data sources</h3>
+      <ul><li><b>Sessions</b>: <code>ds_imputed_reporting.ga4_city_sessions_daily</code></li>
+      <li><b>Deals</b>: <code>zoho_crm.cdc_deals</code> (live Zoho feed)</li>
+      <li><b>Store Visit Raised</b>: <code>zoho_crm.cdc_meetings</code>, with customer details from <code>zoho_crm.cdc_contacts</code></li>
+      <li><b>Store Visited</b>: <code>ds_imputed_reporting.Walkin_marge</code></li>
+      <li><b>Orders and Revenue</b>: <code>ds_imputed_reporting.marketing_sale</code></li></ul>
+
+      <h3>Date range</h3>
+      <ul><li>Presets are Today, Yesterday (default), Last 7d, Last 30d, All data (from the first GA4 day, 3 May 2025, to today) and Custom. Last 7d and Last 30d end yesterday.</li>
+      <li><b>t-2 rule for Sessions:</b> a selected day shows the sessions of the day before it, so Yesterday shows today minus 2 (on 15 Oct, Yesterday 14 Oct shows the sessions of 13 Oct). A range such as 1–30 Sep shows the table for 31 Aug–29 Sep. The Total Sessions card names the dates it used. Every other number uses the dates you select.</li>
+      <li>A yellow banner appears when a source table ends before the selected end date.</li></ul>
+
+      <h3>KPI cards</h3>
+      <ul><li><b>Total Sessions</b>: the sum of the five store cities (Mumbai, Delhi NCR, Noida, Pune, Bengaluru) from the sessions table, for the dates you select.</li>
+      <li><b>Total Deals</b>: every Zoho deal created in the range, in any city, including deals with no city.</li>
+      <li><b>City Deals</b>: deals that have a city (every city except Unknown), with the share of Total Deals.</li>
+      <li><b>Store Visit Raised</b>: customers with a store-visit meeting, shown with the share of Total Deals.</li>
+      <li><b>Store Visited</b>: raised customers who checked in at a store, shown as a share of Store Visit Raised.</li>
+      <li><b>Orders</b>: orders from those raised customers, shown as a share of Store Visit Raised. <b>Revenue</b> is the net sale of those orders. <b>AOV</b> is Revenue ÷ Orders.</li></ul>
+
+      <h3>Customer matching</h3>
+      <ul><li>A customer is matched by <b>mobile number or email</b>. Mobile is the last 10 digits. Email is lower-cased, and placeholder addresses ending in @lucirajewelry.com are ignored.</li>
+      <li>For a meeting, mobile and email come from the meeting's contact (Who_Id in <code>zoho_crm.cdc_contacts</code>), then from the linked deal (What_Id in <code>cdc_deals</code>), then from a phone number written in the contact name.</li>
+      <li>Walk-ins are matched on <code>phone</code> or <code>email</code> in Walkin_marge. Sales are matched on Cus_mobile / mobile1 or email / email_id in marketing_sale.</li>
+      <li>A meeting with no mobile and no email still counts as Store Visit Raised (by meeting id) but cannot be matched to walk-ins or orders.</li></ul>
+
+      <h3>Sessions</h3>
+      <ul><li>Source: <code>ds_imputed_reporting.ga4_city_sessions_daily</code>, which holds one row per day and city group (mumbai, delhi, noida, pune, bengaluru) with city_sessions. It is read for the whole selected range, so any range works, not only the last 7 days.</li>
+      <li>The sessions table is refreshed daily and ends about two days before today. When the selected range reaches past what the table covers, the yellow banner says so and those days show no sessions.</li>
+      <li>The table's city groups follow GA4's own city names, so the numbers agree with the GA4 report (Town/City). Neighbouring cities such as Pimpri-Chinchwad, Thane, Gurugram or Greater Noida are not merged into them. The table has the five store cities only, so Hyderabad and other cities have no sessions here.</li>
+      <li>GA4 knows the visitor's city, not a store. Mumbai sessions are split 50/50 between Borivali and Chembur, and Delhi NCR sessions 50/50 between Lajpat Nagar and Paschim Vihar (an odd session goes to the second store). Noida, Pune and Malleshwaram show their full city sessions. The split parts add back to the city total, so the Total row is not inflated.</li></ul>
+
+      <h3>Deals</h3>
+      <ul><li>Source: <code>zoho_crm.cdc_deals</code>, the live Zoho feed. One row per deal id, dated by created time in IST. The older <code>Lucira_Prod.lucira_zoho_Deals</code> table stopped on 16 Sep 2026, so it is not used.</li>
+      <li>A deal's city is its Address_City. Blank is shown as Unknown. Delhi districts (Central, South, East Delhi and so on), Gurgaon, Faridabad and Ghaziabad count as Delhi NCR. Gautam Buddha Nagar counts as Noida. Thane and similar places count as Mumbai. Other places count as Other Cities.</li>
+      <li>Zoho does not fill Store_Assigned, so deals are assigned to stores by the deal's city. <b>Mumbai</b> deals (including Thane and similar) are split 50/50 between Borivali and Chembur (an odd deal goes to Chembur). <b>Delhi</b> deals go by district: Central, South and South West Delhi, plus Gurgaon (counted as South Delhi), to Lajpat Nagar; North, North West and West Delhi to Paschim Vihar; East Delhi, Noida and Gautam Buddha Nagar to Noida. Delhi deals with only "Delhi" or "New Delhi" (and Faridabad, Ghaziabad) fit none of these districts, so they are in Total Deals and City Deals but not in a store row. Pune and Malleshwaram (Bengaluru) take their full city deals.</li></ul>
+
+      <h3>Store Visit Raised</h3>
+      <ul><li>Source: <code>zoho_crm.cdc_meetings</code>. Distinct customers whose first store-visit meeting was created in the range (IST). Video calls, tests, try-at-home, trial and complaint meetings are excluded.</li>
+      <li>The store comes from the meeting venue: Borivali, Chembur, Lajpat Nagar, Paschim Vihar, Noida, Malleshwaram or Pune, with common misspellings. Meetings at HO or with no identifiable store are not counted anywhere, so the KPI equals the store table total.</li>
+      <li>Meetings are not limited to deals created in the same range, so Store Visit Raised as a share of Total Deals can go above 100%.</li></ul>
+
+      <h3>Store Visited</h3>
+      <ul><li>Source: <code>ds_imputed_reporting.Walkin_marge</code>, StoreVisit check-ins. A raised customer counts as visited when they have a check-in on or after the meeting date. HO, Amazon and billed-return rows are excluded.</li>
+      <li>Store codes: BO1 Borivali, CS1 Chembur, LPN Lajpat Nagar, PV1 Paschim Vihar, N18 Noida, MAL Malleshwaram, PN1 Pune. FCS and HWI have no known city or store, so they have no store row, but a check-in there still counts a raised customer as visited.</li>
+      <li>A customer who raised a visit at one store and checked in at another still counts as visited, under the store of the meeting.</li></ul>
+
+      <h3>Orders and revenue</h3>
+      <ul><li>Source: <code>ds_imputed_reporting.marketing_sale</code>. Distinct document_no for raised customers, dated on or after their meeting. Each customer counts once, so several meetings never double-count an order or a customer.</li>
+      <li>Revenue is the sum of net_sale (excluding tax). AOV is revenue ÷ orders.</li>
+      <li>Order status: cancellations are rows where Fullfillment is cancel_order. The default view excludes them. The Order status filter can show all or only cancelled.</li></ul>
+
+      <h3>Store comparison chart and store table</h3>
+      <ul><li>The chart shows one bar per store for the metric picked in its dropdown, sorted from highest to lowest. Bar colour follows the store's city.</li>
+      <li>Store table columns: Sessions and Deals (assigned to stores as above), Store Visit Raised, % of Raised (the store's share of all raised), Store Visited, % Visited (Visited ÷ Raised), Orders, Order Conv. % (Orders ÷ Raised) and Revenue.</li>
+      <li>Visited, Orders and Revenue are dated by the meeting that started the journey, so those rates are cohort rates. Sessions, Deals and Raised use their own dates.</li></ul>
+
+      <h3>Filters</h3>
+      <ul><li><b>City</b> limits every number. <b>Store</b> limits the store-level numbers (Store Visit Raised, Visited, Orders, Revenue and Delhi-zone deals). Sessions are not changed by the Store filter.</li>
+      <li><b>Deal source</b> limits Deals and the meetings linked to a deal. It does not change Sessions.</li>
+      <li><b>Order source / fulfillment</b> and <b>Order status</b> limit Orders and Revenue only.</li>
+      <li>Results are cached for 5 minutes on the web version, so a repeat query within that time returns the same numbers.</li></ul>
+    </section>
+  </div>
+</div>
+<div id="tip"></div>
+
+<script>
+
+(function(){
+'use strict';
+const SERVER='Google Cloud BigQuery', PROJECT='lucirajewelry-prod';
+const CITIES=['Mumbai','Delhi NCR','Pune','Noida','Bengaluru','Hyderabad','Other Cities','Unknown'];
+const CCOL={'Mumbai':'--c-mumbai','Delhi NCR':'--c-delhi','Pune':'--c-pune','Noida':'--c-noida','Bengaluru':'--c-blr','Hyderabad':'--c-hyd','Other Cities':'--c-other','Unknown':'--c-unknown'};
+const col=c=>`var(${CCOL[c]||'--c-unknown'})`;
+const LEAD_EXCL=new Set(['Unknown','Other Cities']);
+const METRICS=[['sessions','Sessions'],['deals','Deals'],['raised','Store Visit Raised'],['visited','Store Visited'],['orders','Orders'],['revenue','Revenue']];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const nf=new Intl.NumberFormat('en-IN');
+const fmt=n=>nf.format(Math.round(n));
+const inrFull=n=>'₹'+nf.format(Math.round(n));
+const inr=n=>{const a=Math.abs(n);return a>=1e7?'₹'+(n/1e7).toFixed(2)+' Cr':a>=1e5?'₹'+(n/1e5).toFixed(2)+' L':'₹'+nf.format(Math.round(n))};
+const pct=(a,b)=>b>0?(a/b*100).toFixed(1)+'%':'–';
+const pctN=(a,b)=>b>0?a/b*100:null;
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const parseYmd=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const lbl=s=>parseYmd(s).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+const lblShort=s=>parseYmd(s).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+
+/* ---------- filters ---------- */
+const STORES=['Borivali','Chembur','Paschim Vihar','Lajpat Nagar','Noida','Malleshwaram','Pune'];
+const MS=[['cities','City'],['stores','Store'],['sources','Deal source'],['fulfillment','Order source / fulfillment']];
+const state={preset:'yesterday',from:'',to:'',status:'active'};
+MS.forEach(([k])=>state[k]=new Set());
+let OPTS={cities:CITIES.slice(),stores:STORES.slice()};
+
+let EARLIEST='2024-01-01';
+function presetRange(p){
+  const t=new Date();t.setHours(0,0,0,0);
+  if(p==='all')return[EARLIEST,ymd(t)];
+  if(p==='thismonth')return[ymd(new Date(t.getFullYear(),t.getMonth(),1)),ymd(t)];
+  if(p==='lastmonth')return[ymd(new Date(t.getFullYear(),t.getMonth()-1,1)),ymd(new Date(t.getFullYear(),t.getMonth(),0))];
+  if(p==='today')return[ymd(t),ymd(t)];
+  if(p==='yesterday'){const y=addDays(t,-1);return[ymd(y),ymd(y)]}
+  if(p==='last30')return[ymd(addDays(t,-30)),ymd(addDays(t,-1))];
+  return[ymd(addDays(t,-7)),ymd(addDays(t,-1))];
+}
+function syncRange(){
+  if(state.preset!=='custom'){[state.from,state.to]=presetRange(state.preset)}
+  document.querySelectorAll('#preset button').forEach(b=>b.classList.toggle('on',b.dataset.p===state.preset));
+  $('dfrom').value=state.from;$('dto').value=state.to;
+  $('cfrom').hidden=$('cto').hidden=state.preset!=='custom';
+  const n=Math.round((parseYmd(state.to)-parseYmd(state.from))/864e5)+1;
+  $('rangeLbl').textContent=state.from===state.to?lbl(state.from):`${lbl(state.from)} – ${lbl(state.to)} · ${n} days`;
+}
+function buildMs(){
+  const host=$('msHost');host.innerHTML='';
+  MS.forEach(([k,label])=>{
+    const vals=OPTS[k]||[];
+    const d=document.createElement('details');d.className='ms';d.dataset.k=k;
+    const s=document.createElement('summary');d.appendChild(s);
+    const pop=document.createElement('div');pop.className='pop';
+    if(!vals.length)pop.innerHTML='<span class="sub" style="padding:6px">Loading options…</span>';
+    vals.forEach(v=>{
+      const l=document.createElement('label');const c=document.createElement('input');c.type='checkbox';c.checked=state[k].has(v);
+      c.addEventListener('change',()=>{c.checked?state[k].add(v):state[k].delete(v);sumLabel(d,label);schedule()});
+      l.append(c,document.createTextNode(v));pop.appendChild(l);
+    });
+    d.appendChild(pop);host.appendChild(wrapMs(label,d));sumLabel(d,label);
+  });
+}
+function wrapMs(label,d){const w=document.createElement('label');w.className='l';w.append(label);w.appendChild(d);
+  w.addEventListener('click',e=>{if(e.target.tagName==='LABEL'&&e.target!==w)return});return w}
+function sumLabel(d,label){const k=d.dataset.k,n=state[k].size;d.querySelector('summary').innerHTML=n?`<b>${n} selected</b>`:'All'}
+document.addEventListener('click',e=>{document.querySelectorAll('details.ms[open]').forEach(d=>{if(!d.contains(e.target))d.open=false})});
+
+/* ---------- BigQuery via connector ---------- */
+let mcp=null;
+async function api(kind,body){
+  const r=await fetch(kind==='main'?'api/main':'api/options',kind==='main'?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw {code:'http_'+r.status,message:j.error||('HTTP '+r.status)};
+  return j.rows;
+}
+function rowsFrom(p){
+  if(!p||!p.schema)throw {code:'bad_shape',message:'Unexpected BigQuery response'};
+  const f=p.schema.fields.map(x=>x.name),t=p.schema.fields.map(x=>x.type);
+  return (p.rows||[]).map(r=>{const o={};r.f.forEach((c,i)=>{let v=c.v;if(v!=null&&['INTEGER','FLOAT','NUMERIC','BIGNUMERIC'].includes(t[i]))v=Number(v);o[f[i]]=v});return o});
+}
+async function runSql(query){
+  let r=await mcp.callTool(SERVER,'execute_sql_readonly',{projectId:PROJECT,query,timeoutMs:100000},{cache:false});
+  let p=r.payload;
+  if(p&&p.jobComplete===false){
+    const jobId=p.jobReference&&p.jobReference.jobId||p.jobId;
+    for(let i=0;i<30&&jobId;i++){
+      await new Promise(s=>setTimeout(s,4000));
+      r=await mcp.callTool(SERVER,'get_query_results',{projectId:PROJECT,jobId,location:(p.jobReference&&p.jobReference.location)||undefined,timeoutMs:20000},{cache:false});
+      p=r.payload;if(p&&p.jobComplete!==false)break;
+    }
+  }
+  return rowsFrom(p);
+}
+function errText(e){
+  const c=e&&e.code;
+  if(c==='needs_reauth')return'The BigQuery connector needs to be reconnected in claude.ai Settings → Connectors.';
+  if(c==='server_not_connected'||c==='selection_required')return'Add or select the Google Cloud BigQuery connector in claude.ai Settings → Connectors, then reload.';
+  if(c==='not_in_manifest'||c==='consent_required')return'This page was not allowed to use BigQuery. Allow the connector for this page and reload.';
+  if(c==='blocked_by_policy'||c==='approval_required')return'Your organisation policy blocks BigQuery calls from this page.';
+  if(c==='not_granted'||c==='capability_disabled'||c==='capability_removed')return'Live BigQuery access is not available in this view. Open the page in claude.ai.';
+  return'Query failed: '+((e&&e.message)||'unknown error');
+}
+
+/* ---------- loading ---------- */
+let seq=0,timer=null,DATA=[],sortKey='sessions',sortAsc=false,trendMetric='sessions',hidden=new Set();
+function schedule(){clearTimeout(timer);timer=setTimeout(load,700)}
+function filters(){return{from:state.from,to:state.to,status:state.status,cities:[...state.cities],stores:[...state.stores],sources:[...state.sources],fulfillment:[...state.fulfillment]}}
+async function load(){
+  if(!mcp)return;
+  const my=++seq;$('root').classList.add('loading');$('status').textContent='Querying BigQuery…';
+  $('notices').querySelectorAll('.err').forEach(n=>n.remove());
+  try{
+    const rows=await api('main',filters());
+    if(my!==seq)return;
+    DATA=rows;render();$('status').textContent='Updated '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    if(my!==seq)return;
+    DATA=[];render();
+    const n=document.createElement('div');n.className='notice err';n.textContent=errText(e);$('notices').appendChild(n);$('status').textContent='Failed';
+  }finally{if(my===seq)$('root').classList.remove('loading')}
+}
+async function loadOptions(){
+  try{
+    const rows=await api('options');
+    const m={};rows.forEach(r=>(m[r.k]=m[r.k]||[]).push(r.v));
+    OPTS={cities:CITIES.slice(),stores:STORES.slice(),sources:m.source||[],fulfillment:m.fulfillment||[]};
+    if(m.earliest_ga4&&m.earliest_ga4[0]){const e=m.earliest_ga4[0];EARLIEST=e.slice(0,4)+'-'+e.slice(4,6)+'-'+e.slice(6);if(state.preset==='all'){syncRange();schedule()}}
+    FRESH={deals:m.freshness_deals&&m.freshness_deals[0],meetings:m.freshness_meetings&&m.freshness_meetings[0],walkins:m.freshness_walkins&&m.freshness_walkins[0],sales:m.freshness_sales&&m.freshness_sales[0],ga4:m.freshness_ga4&&m.freshness_ga4[0]};
+    buildMs();freshness();
+  }catch(e){}
+}
+let FRESH={};
+function freshness(){
+  $('notices').querySelectorAll('.stale').forEach(n=>n.remove());
+  const names={deals:'Deals (Zoho)',meetings:'Meetings',walkins:'Walk-ins',sales:'Sales',ga4:'GA4 sessions'};
+  const stale=[];
+  Object.keys(names).forEach(k=>{let v=FRESH[k];if(!v)return;if(/^\d{8}$/.test(v))v=v.slice(0,4)+'-'+v.slice(4,6)+'-'+v.slice(6);
+    if(v<state.to)stale.push(`${names[k]} data ends ${lbl(v)}`)});
+  if(stale.length){const n=document.createElement('div');n.className='notice stale';n.textContent='Source freshness: '+stale.join(' · ')+'. Stages after those dates show no rows.';$('notices').appendChild(n)}
+}
+
+/* ---------- aggregation ---------- */
+function aggregate(){
+  const sby=new Map(),by=new Map(),tot={sessions:0,deals:0,raised:0,visited:0,orders:0,revenue:0,walkins:0},days=new Map();
+  DATA.forEach(r=>{
+    let c=by.get(r.city);if(!c){c={city:r.city,sessions:0,deals:0,raised:0,visited:0,orders:0,revenue:0,walkins:0};by.set(r.city,c)}
+    if(r.store){let s=sby.get(r.store);if(!s){s={store:r.store,deals:0,raised:0,visited:0,orders:0,revenue:0,walkins:0};sby.set(r.store,s)}for(const k of ['deals','raised','visited','orders','revenue','walkins'])s[k]+=Number(r[k])||0}
+    let d=days.get(r.d);if(!d){d=new Map();days.set(r.d,d)}
+    let dc=d.get(r.city);if(!dc){dc={sessions:0,deals:0,raised:0,visited:0,orders:0,revenue:0};d.set(r.city,dc)}
+    for(const k of Object.keys(tot)){const v=Number(r[k])||0;c[k]+=v;tot[k]+=v;if(k in dc)dc[k]+=v}
+  });
+  const cities=[...by.values()].sort((a,b)=>CITIES.indexOf(a.city)-CITIES.indexOf(b.city));
+  const stores=[...sby.values()].sort((a,b)=>STORES.indexOf(a.store)-STORES.indexOf(b.store));
+  return{cities,tot,days,stores};
+}
+
+/* ---------- tooltip ---------- */
+const tip=$('tip');
+function showTip(e,html){tip.innerHTML=html;tip.style.opacity=1;const w=tip.offsetWidth;let x=e.clientX+14,y=e.clientY+14;if(x+w>innerWidth-8)x=e.clientX-w-14;tip.style.left=Math.max(8,x)+'px';tip.style.top=y+'px'}
+function hideTip(){tip.style.opacity=0}
+document.addEventListener('mouseover',e=>{const t=e.target.closest('[data-tip]');if(t)showTip(e,t.dataset.tip)});
+document.addEventListener('mousemove',e=>{if(tip.style.opacity==='1'&&e.target.closest&&e.target.closest('[data-tip]'))showTip(e,e.target.closest('[data-tip]').dataset.tip)});
+document.addEventListener('mouseout',e=>{if(e.target.closest&&e.target.closest('[data-tip]'))hideTip()});
+
+/* ---------- render ---------- */
+const fm=(k,v)=>k==='revenue'?inr(v):fmt(v);
+function render(){
+  const {cities,tot,days,stores}=aggregate();
+  freshness();
+  // KPIs
+  const aov=tot.orders>0?tot.revenue/tot.orders:0;
+  const cityDeals=cities.reduce((s,c)=>c.city==='Unknown'?s:s+c.deals,0);
+  const STORE_CITIES=GROUPS.map(g=>g[0]);
+  const citySessions=cities.reduce((s,c)=>STORE_CITIES.includes(c.city)?s+c.sessions:s,0);
+  const K=[['Total Sessions',fmt(citySessions),'Mumbai, Delhi NCR, Noida, Pune, Bengaluru · sessions of '+(state.from===state.to?lbl(ymd(addDays(parseYmd(state.from),-1))):lblShort(ymd(addDays(parseYmd(state.from),-1)))+' – '+lbl(ymd(addDays(parseYmd(state.to),-1))))],['Total Deals',fmt(tot.deals),'all deals created'],['City Deals',fmt(cityDeals),pct(cityDeals,tot.deals)+' of deals have a city'],['Store Visit Raised',fmt(tot.raised),pct(tot.raised,tot.deals)+' of deals'],['Store Visited',fmt(tot.visited),pct(tot.visited,tot.raised)+' of raised'],['Orders',fmt(tot.orders),pct(tot.orders,tot.raised)+' of raised'],['Revenue',inr(tot.revenue),inrFull(tot.revenue)],['AOV',tot.orders?inr(aov):'–','revenue ÷ orders']];
+  $('kpis').innerHTML=K.map(([k,v,d])=>`<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
+  // table
+  renderStores(stores,cities);
+  renderStoreChart(stores,cities);
+}
+const STORE_VAR={'Borivali':'--s-1','Chembur':'--s-2','Lajpat Nagar':'--s-3','Paschim Vihar':'--s-4','Noida':'--s-5','Malleshwaram':'--s-6','Pune':'--s-7'};
+const scol=s=>'var('+(STORE_VAR[s]||'--c-unknown')+')';
+let SC={stores:[],cities:[]};
+/* A city's sessions split evenly across its stores; any odd session goes to the last store, so the parts add up to the city total. */
+function splitSessions(total,count,i){const base=Math.floor(total/count);return i===count-1?total-base*(count-1):base}
+function storeRows(stores,cities){
+  const sm=Object.fromEntries(stores.map(s=>[s.store,s])),cs=Object.fromEntries(cities.map(c=>[c.city,c]));
+  const out=[];
+  GROUPS.forEach(([city,names])=>names.forEach((n,i)=>{
+    const s=sm[n]||{deals:0,raised:0,visited:0,orders:0,revenue:0},c=cs[city]||{sessions:0,deals:0};
+    // Deals: Delhi-area stores take their own zones (by the deal's district), Mumbai is split 50/50, other cities have one store
+    const deals=(city==='Delhi NCR'||city==='Noida')?(s.deals||0):city==='Mumbai'?splitSessions(c.deals||0,names.length,i):(c.deals||0);
+    out.push({store:n,city,sessions:splitSessions(c.sessions||0,names.length,i),deals,raised:s.raised,visited:s.visited,orders:s.orders,revenue:s.revenue});
+  }));
+  return out;
+}
+function renderStoreChart(stores,cities){
+  SC={stores,cities};
+  const k=$('scMetric').value,label=$('scMetric').selectedOptions[0].textContent;
+  const rows=storeRows(stores,cities).sort((a,b)=>b[k]-a[k]);
+  const mx=Math.max(...rows.map(r=>r[k]),0);
+  $('scSub').textContent=$('rangeLbl').textContent+' · all '+rows.length+' stores';
+  $('scBars').innerHTML=rows.map(r=>'<span class="nm" title="'+esc(r.store)+'">'+esc(r.store)+'</span><span class="tr" data-tip="'+esc('<b>'+r.store+'</b><div><span>'+label+'</span><span>'+(k==='revenue'?inrFull(r[k]):fmt(r[k]))+'</span></div>'+((k==='sessions'||k==='deals')?'<div><span>Basis</span><span>split from city</span></div>':''))+'"><span class="fl" style="width:'+(mx>0?r[k]/mx*84:0)+'%;background:'+scol(r.store)+'"></span><span class="vl">'+fm(k,r[k])+'</span></span>').join('');
+  $('scHint').textContent=(k==='sessions'||k==='deals')?'Mumbai sessions and deals are split evenly between Borivali and Chembur, and Delhi NCR sessions between Lajpat Nagar and Paschim Vihar. Delhi-area deals follow the district of the deal.':'';
+}
+const GROUPS=[['Mumbai',['Borivali','Chembur']],['Delhi NCR',['Lajpat Nagar','Paschim Vihar']],['Noida',['Noida']],['Pune',['Pune']],['Bengaluru',['Malleshwaram']]];
+function renderStores(stores,cities){
+  const rows=storeRows(stores,cities);
+  const T={sessions:0,deals:0,raised:0,visited:0,orders:0,revenue:0};
+  rows.forEach(r=>{for(const k in T)T[k]+=r[k]});
+  const p=(x,y)=>y>0?(x/y*100).toFixed(1)+'%':'–';
+  const cells=(s)=>'<td>'+fmt(s.sessions)+'</td><td>'+fmt(s.deals)+'</td><td>'+fmt(s.raised)+'</td><td>'+p(s.raised,T.raised)+'</td><td>'+fmt(s.visited)+'</td><td>'+p(s.visited,s.raised)+'</td><td>'+fmt(s.orders)+'</td><td>'+p(s.orders,s.raised)+'</td><td>'+inrFull(s.revenue)+'</td>';
+  const body=rows.map(r=>'<tr><td>'+esc(r.store)+'</td>'+cells(r)+'</tr>').join('');
+  const heads=['Store','Sessions','Deals','Store Visit Raised','% of Raised','Store Visited','% Visited','Orders','Order Conv. %','Revenue'];
+  $('tblStore').innerHTML='<thead><tr>'+heads.map(n=>'<th style="cursor:default">'+n+'</th>').join('')+'</tr></thead><tbody>'+body+'<tr class="tot"><td>Total</td>'+cells(T)+'</tr></tbody>';
+}
+const TCOLS=[['city','City'],['sessions','Sessions'],['deals','Deals'],['pdeals','% City Deals'],['raised','Store Visit Raised'],['praised','% Visit Raised'],['visited','Store Visited'],['pvisited','% Visited'],['orders','Orders'],['pord','Order Conv. %'],['revenue','Revenue'],['aov','AOV'],['walkins','Total walk-ins']];
+function derive(c,tot){return{...c,pdeals:pctN(c.deals,tot.deals),praised:pctN(c.raised,c.deals),pvisited:pctN(c.visited,c.raised),pord:pctN(c.orders,c.raised),aov:c.orders?c.revenue/c.orders:null}}
+function renderTable(cities,tot){
+  const rows=cities.map(c=>derive(c,tot));
+  rows.sort((a,b)=>{if(sortKey==='city')return sortAsc?a.city.localeCompare(b.city):b.city.localeCompare(a.city);const x=a[sortKey]??-1,y=b[sortKey]??-1;return sortAsc?x-y:y-x});
+  const p=v=>v==null?'–':v.toFixed(1)+'%';
+  const row=(r,t)=>`<tr${t?' class="tot"':''}><td>${t?'Total':`<i class="dot" style="background:${col(r.city)}"></i>${r.city}`}</td><td>${fmt(r.sessions)}<small>${pct(r.sessions,tot.sessions)}</small></td><td>${fmt(r.deals)}</td><td>${t?'100.0%':p(r.pdeals)}</td><td>${fmt(r.raised)}</td><td>${p(r.praised)}</td><td>${fmt(r.visited)}</td><td>${p(r.pvisited)}</td><td>${fmt(r.orders)}</td><td>${p(r.pord)}</td><td>${inrFull(r.revenue)}</td><td>${r.aov==null?'–':inrFull(r.aov)}</td><td>${fmt(r.walkins)}</td></tr>`;
+  $('tbl').innerHTML=`<thead><tr>${TCOLS.map(([k,n])=>`<th data-k="${k}" class="${k===sortKey?'s'+(sortAsc?' asc':''):''}">${n}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>row(r)).join('')}${row(derive({city:'Total',...tot},tot),true)}</tbody>`;
+  $('tbl').querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k===sortKey)sortAsc=!sortAsc;else{sortKey=k;sortAsc=k==='city'}renderTable(cities,tot)});
+}
+/* ---------- wiring ---------- */
+document.querySelectorAll('#preset button').forEach(b=>b.onclick=()=>{state.preset=b.dataset.p;if(state.preset==='custom'){state.from=$('dfrom').value||state.from;state.to=$('dto').value||state.to}syncRange();if(state.preset!=='custom')schedule()});
+$('dfrom').onchange=e=>{state.from=e.target.value;if(state.from>state.to)state.to=state.from;syncRange();schedule()};
+$('dto').onchange=e=>{state.to=e.target.value;if(state.to<state.from)state.from=state.to;syncRange();schedule()};
+$('status_f').onchange=e=>{state.status=e.target.value;schedule()};
+$('apply').onclick=()=>{clearTimeout(timer);load()};
+$('reset').onclick=()=>{MS.forEach(([k])=>state[k].clear());state.preset='yesterday';state.status='active';$('status_f').value='active';syncRange();buildMs();schedule()};
+
+$('scMetric').onchange=()=>renderStoreChart(SC.stores,SC.cities);
+document.querySelectorAll('.navtabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.navtabs button').forEach(x=>x.classList.toggle('on',x===b));['pDash','pLogic'].forEach(id=>$(id).hidden=id!==b.dataset.tab);window.scrollTo(0,0)});
+function curTheme(){const d=document.documentElement.getAttribute('data-theme');return d||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}
+function paintTheme(){$('themeBtn').textContent=curTheme()==='dark'?'Light':'Dark'}
+try{const sv=localStorage.getItem('lcf-theme');if(sv)document.documentElement.setAttribute('data-theme',sv)}catch(e){}
+$('themeBtn').onclick=()=>{const n=curTheme()==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);try{localStorage.setItem('lcf-theme',n)}catch(e){}paintTheme()};
+$('refreshBtn').onclick=()=>{clearTimeout(timer);load()};
+paintTheme();
+syncRange();buildMs();
+(async()=>{
+  try{mcp=true}catch(e){mcp=null}
+  if(!mcp){const n=document.createElement('div');n.className='notice err';n.textContent='Could not start.';$('notices').appendChild(n);$('status').textContent='Not connected';return}
+  loadOptions();load();
+})();
+})();
+</script>
+</body></html>

@@ -1,0 +1,6 @@
+node_modules/
+.env
+data/
+*.log
+gcp-service-account.json
+.claude/

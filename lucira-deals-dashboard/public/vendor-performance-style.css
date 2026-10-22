@@ -1,0 +1,32 @@
+/* Additions on top of sales-analytics-style.css (shared look). */
+main.simple{max-width:1400px;margin:0 auto}
+.kpis.k4{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.kpi[title]{cursor:help}
+.chart-h{position:relative;width:100%}
+.st-cell{font-weight:600;padding:2px 6px;border-radius:6px}
+.cell-bar{position:relative}
+.cell-bar i{position:absolute;left:0;top:0;bottom:0;background:var(--neg);opacity:.16;pointer-events:none}
+.tf select{min-width:170px}
+tr.sel td{background:var(--gold-wash)}
+
+/* Multi-select filters (checkbox dropdowns) */
+.tf .ms{width:190px}
+.tf .ms>summary{font-size:13px;padding:7px 10px;color:var(--text)}
+.tf .ms>summary>.ms-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tf .ms>summary::after{content:'▾';color:var(--text-2);margin-left:auto}
+.tf .ms .ms-panel{max-width:340px;max-height:320px}
+.tf .ms .ms-panel label[hidden]{display:none}
+.tf .ms .ms-q{width:100%;margin-bottom:4px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font:13px Inter}
+
+/* Store filter inside the vendor pop-up */
+#mStore{width:200px}
+#mStore>summary{font-size:13px;padding:7px 10px;color:var(--text)}
+#mStore>summary>.ms-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#mStore>summary::after{content:'▾';color:var(--text-2);margin-left:auto}
+#mStore .ms-panel{max-width:320px;max-height:300px}
+#mStore .ms-panel label[hidden]{display:none}
+#mStore .ms-q{width:100%;margin-bottom:4px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font:13px Inter}
+
+.kpi.clk{cursor:pointer}.kpi.clk:hover{border-color:var(--gold)}
+
+.nf-btn{border-color:var(--gold);background:var(--gold-wash)}.nf-btn b{margin-left:6px;color:var(--gold)}

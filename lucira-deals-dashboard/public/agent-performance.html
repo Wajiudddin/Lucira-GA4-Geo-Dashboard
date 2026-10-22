@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agent Performance Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <header class="app-header">
+      <div>
+        <h1>Agent Performance Dashboard</h1>
+        <p class="subtitle">Zoho CRM &middot; Deals, Calls &amp; Tasks grouped by owner &middot; <a class="nav-link" href="index.html">Deals Dashboard &rarr;</a></p>
+      </div>
+      <div class="header-actions">
+        <span id="updatedAt" class="updated-at"></span>
+        <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+        <button id="refreshBtn" class="refresh-btn">Refresh</button>
+
+        <div class="filters-dropdown" id="filtersDropdown">
+          <button type="button" class="filters-toggle" id="filtersToggle">
+            Filters <span class="filters-toggle-caret">&#9662;</span>
+          </button>
+
+          <div class="filters-panel" id="filtersPanel" hidden>
+            <button type="button" id="applyFilters" class="apply-filters-btn">Apply</button>
+
+            <div class="filter-section">
+              <div class="filter-section-title">Deal date basis</div>
+              <div class="tabs" role="tablist" aria-label="Date basis">
+                <button class="tab-btn is-active" data-tab="Created_Time" role="tab" aria-selected="true">Created Date</button>
+                <button class="tab-btn" data-tab="Modified_Time" role="tab" aria-selected="false">Modified Date</button>
+              </div>
+            </div>
+
+            <div class="filter-section">
+              <div class="filter-section-title">Date range</div>
+              <div class="filter-options" id="rangeOptions">
+                <button class="option-btn" data-range="daily">Today</button>
+                <button class="option-btn is-active" data-range="yesterday">Yesterday</button>
+                <button class="option-btn" data-range="weekly">Weekly</button>
+                <button class="option-btn" data-range="monthly">Monthly</button>
+                <button class="option-btn" data-range="quarterly">Quarterly</button>
+                <button class="option-btn" data-range="yearly">Yearly</button>
+                <button class="option-btn" data-range="custom">Custom</button>
+              </div>
+              <div id="customRangeForm" class="custom-range-form" hidden>
+                <label for="customStart">From</label>
+                <input type="date" id="customStart" />
+                <label for="customEnd">To</label>
+                <input type="date" id="customEnd" />
+              </div>
+            </div>
+
+            <div class="filter-section">
+              <div class="filter-section-title">Agent</div>
+              <div class="multiselect" id="agentMultiselect">
+                <button type="button" class="multiselect-toggle" id="agentToggle">All agents</button>
+                <div class="multiselect-panel" id="agentPanel" hidden></div>
+              </div>
+            </div>
+
+            <div class="filter-meta" id="filterMeta"></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div id="statusBar" class="status-bar" hidden></div>
+
+    <div class="report-layout">
+      <section class="report-main">
+        <h2 class="table-heading">Zoho Deals</h2>
+        <div class="th-sub" id="dealsMeta" style="margin-bottom:8px;"></div>
+        <div class="table-wrap table-wrap--spaced">
+          <table class="report-table" id="dealsTable">
+            <thead id="dealsTableHead"></thead>
+            <tbody id="dealsTableBody"></tbody>
+          </table>
+        </div>
+        <button class="export-btn" data-export-table="dealsTable" data-export-filename="zoho-deals-by-agent">&#8595; Export CSV</button>
+
+        <h2 class="table-heading">Deal Call Status</h2>
+        <div class="th-sub" id="dealCallStatusMeta" style="margin-bottom:8px;"></div>
+        <div class="table-wrap table-wrap--spaced">
+          <table class="report-table" id="dealCallStatusTable">
+            <thead id="dealCallStatusTableHead"></thead>
+            <tbody id="dealCallStatusTableBody"></tbody>
+          </table>
+        </div>
+        <button class="export-btn" data-export-table="dealCallStatusTable" data-export-filename="deal-call-status">&#8595; Export CSV</button>
+
+        <h2 class="table-heading">Deal Status Dump</h2>
+        <div class="th-sub" id="dealStatusDumpMeta" style="margin-bottom:8px;"></div>
+        <input type="text" id="dealStatusDumpSearch" class="dump-search" placeholder="Search owner, mobile, stage, trigger event…">
+        <div class="table-wrap table-wrap--scroll-y table-wrap--spaced">
+          <table class="report-table" id="dealStatusDumpTable">
+            <thead>
+              <tr>
+                <th class="sortable-th" data-sort-key="owner">Owner<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-sort-key="mobile">Mobile<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-sort-key="stage">Stage<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-sort-key="triggerEvent">Trigger Event<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-sort-key="workStatus">Work Status<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-sort-key="called">Called<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-sort-key="callCount">Call Count<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-sort-key="activityCount">Activity<span class="sort-arrow"></span></th>
+              </tr>
+            </thead>
+            <tbody id="dealStatusDumpBody"></tbody>
+          </table>
+        </div>
+        <button class="export-btn" data-export-table="dealStatusDumpTable" data-export-filename="deal-status-dump">&#8595; Export CSV</button>
+
+        <h2 class="table-heading">Zoho Calls</h2>
+        <div class="th-sub" id="callsMeta" style="margin-bottom:8px;"></div>
+        <div class="table-wrap table-wrap--spaced">
+          <table class="report-table" id="callsTable">
+            <thead id="callsTableHead"></thead>
+            <tbody id="callsTableBody"></tbody>
+          </table>
+        </div>
+        <button class="export-btn" data-export-table="callsTable" data-export-filename="zoho-calls-by-agent">&#8595; Export CSV</button>
+
+        <h2 class="table-heading">Closed Lost</h2>
+        <div class="th-sub" id="closedLostMeta" style="margin-bottom:8px;"></div>
+        <div class="table-wrap table-wrap--spaced">
+          <table class="report-table" id="closedLostTable">
+            <thead id="closedLostTableHead"></thead>
+            <tbody id="closedLostTableBody"></tbody>
+          </table>
+        </div>
+        <button class="export-btn" data-export-table="closedLostTable" data-export-filename="closed-lost-by-agent">&#8595; Export CSV</button>
+
+        <h2 class="table-heading">Zoho Task</h2>
+        <div class="th-sub" id="tasksMeta" style="margin-bottom:8px;"></div>
+        <div class="table-wrap table-wrap--spaced">
+          <table class="report-table" id="tasksTable">
+            <thead id="tasksTableHead"></thead>
+            <tbody id="tasksTableBody"></tbody>
+          </table>
+        </div>
+        <button class="export-btn" data-export-table="tasksTable" data-export-filename="zoho-tasks-by-agent">&#8595; Export CSV</button>
+
+        <div class="th-sub" id="dumpDetailMeta" style="margin-bottom:4px;"></div>
+        <div class="table-heading-row">
+          <h2 class="table-heading">Overall Dump</h2>
+          <span class="th-sub" id="dumpMeta"></span>
+        </div>
+        <div class="table-wrap table-wrap--scroll-y">
+          <table class="report-table" id="dumpTable">
+            <thead>
+              <tr>
+                <th>Created</th>
+                <th>Modified</th>
+                <th>Stage</th>
+                <th>Probability Score</th>
+                <th>&ge;70%</th>
+                <th>Amount</th>
+                <th>Mobile</th>
+                <th>Owner</th>
+                <th>Trigger event</th>
+                <th>WhatsApp</th>
+                <th>First call</th>
+                <th>Call type</th>
+                <th>Call duration<br><span class="th-sub">sec</span></th>
+                <th>Connected &ge;30s</th>
+                <th>Call date &minus; Create date<br><span class="th-sub">hh:mm:ss</span></th>
+                <th>Call count</th>
+                <th>Task created</th>
+                <th>Task count</th>
+              </tr>
+            </thead>
+            <tbody id="dumpBody"></tbody>
+          </table>
+        </div>
+        <button class="export-btn" data-export-table="dumpTable" data-export-filename="agent-performance-dump">&#8595; Export CSV</button>
+      </section>
+    </div>
+  </div>
+
+  <script src="agent-performance.js"></script>
+</body>
+</html>

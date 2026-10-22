@@ -1,0 +1,150 @@
+[
+  {
+    "name": "locations/16909883407608528772",
+    "title": "Lucira Jewelry | Jewellery Store in Mumbai",
+    "phoneNumbers": {
+      "primaryPhone": "090044 36052",
+      "additionalPhones": [
+        "090044 02038"
+      ]
+    },
+    "storefrontAddress": {
+      "regionCode": "IN",
+      "languageCode": "en",
+      "postalCode": "400062",
+      "administrativeArea": "Maharashtra",
+      "locality": "Mumbai",
+      "addressLines": [
+        "14th Floor Office 1402-2 DLH Park",
+        "SV Road"
+      ]
+    }
+  },
+  {
+    "name": "locations/10408913288017402930",
+    "title": "Lucira Jewelry",
+    "phoneNumbers": {
+      "primaryPhone": "086573 92887"
+    },
+    "storefrontAddress": {
+      "regionCode": "IN",
+      "languageCode": "en",
+      "postalCode": "201301",
+      "administrativeArea": "Uttar Pradesh",
+      "locality": "Noida",
+      "addressLines": [
+        "SCO-17, Wave One Courtyard",
+        "Sector 18, Gautam Buddha Nagar"
+      ]
+    }
+  },
+  {
+    "name": "locations/10224652227514643489",
+    "title": "Lucira Jewelry | Jewellery Store in Malleshwaram Bengaluru",
+    "phoneNumbers": {
+      "primaryPhone": "072089 34783"
+    },
+    "storefrontAddress": {
+      "regionCode": "IN",
+      "languageCode": "en",
+      "postalCode": "560003",
+      "administrativeArea": "Karnataka",
+      "locality": "Bengaluru",
+      "addressLines": [
+        "Ground Floor, Building No. 524, 2nd Main",
+        "Sampige Road, Malleshwaram"
+      ]
+    }
+  },
+  {
+    "name": "locations/3055992412259498601",
+    "title": "Lucira Jewelry | Jewellery Store in Chembur Mumbai",
+    "phoneNumbers": {
+      "primaryPhone": "090044 02038",
+      "additionalPhones": [
+        "089768 13164"
+      ]
+    },
+    "storefrontAddress": {
+      "regionCode": "IN",
+      "languageCode": "en",
+      "postalCode": "400071",
+      "administrativeArea": "Maharashtra",
+      "locality": "Mumbai",
+      "addressLines": [
+        "Shop No. 3 Ground Floor, 487 Geraldine CHS LTD",
+        "Central Avenue Road",
+        "Chembur"
+      ]
+    }
+  },
+  {
+    "name": "locations/17576267208640023831",
+    "title": "Lucira Jewelry | Jewellery Store in Paschim Vihar",
+    "phoneNumbers": {
+      "primaryPhone": "072080 07494"
+    },
+    "storefrontAddress": {
+      "regionCode": "IN",
+      "languageCode": "en",
+      "postalCode": "110063",
+      "administrativeArea": "Delhi",
+      "locality": "New Delhi",
+      "addressLines": [
+        "B-8, Shubham Enclave",
+        "Paschim Vihar"
+      ]
+    }
+  },
+  {
+    "name": "locations/6052781422524984127",
+    "title": "Lucira Jewelry | Jewellery Store in Borivali Mumbai",
+    "phoneNumbers": {
+      "primaryPhone": "084336 67238"
+    },
+    "storefrontAddress": {
+      "regionCode": "IN",
+      "languageCode": "en",
+      "postalCode": "400066",
+      "administrativeArea": "Maharashtra",
+      "locality": "Mumbai",
+      "addressLines": [
+        "Sky City Mall, S-40, 2nd Floor, Western Express Hwy, Borivali East, Mumbai"
+      ]
+    }
+  },
+  {
+    "name": "locations/11791209734796066239",
+    "title": "Lucira Jewelry | Jewellery Store in Lajpat Nagar",
+    "phoneNumbers": {
+      "primaryPhone": "072080 07495"
+    },
+    "storefrontAddress": {
+      "regionCode": "IN",
+      "languageCode": "en",
+      "postalCode": "110024",
+      "administrativeArea": "Delhi",
+      "locality": "New Delhi",
+      "addressLines": [
+        "A-59A, Ground Floor, Left Side Lajpat Nagar -2"
+      ]
+    }
+  },
+  {
+    "name": "locations/12953187546662035729",
+    "title": "Lucira Jewelry | Jewellery Store in JM Road Pune",
+    "phoneNumbers": {
+      "primaryPhone": "084336 67236"
+    },
+    "storefrontAddress": {
+      "regionCode": "IN",
+      "languageCode": "en",
+      "postalCode": "411005",
+      "administrativeArea": "Maharashtra",
+      "locality": "Pune",
+      "addressLines": [
+        "Sai Square, Shop no. 3,4,5 & 6, Balgandharv Chowk, Jangli Maharaj Road,"
+      ]
+    }
+  }
+]

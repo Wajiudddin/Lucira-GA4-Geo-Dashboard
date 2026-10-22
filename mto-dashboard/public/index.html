@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MTO Journey · Lucira</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <div>
+    <div class="eyebrow">Operations · Made-to-Order</div>
+    <h1>MTO Control Tower</h1>
+  </div>
+  <div class="top-meta">
+    <span id="freshness" class="muted"></span>
+    <button id="dqPill" class="pill" title="Click to see the unmapped orders"></button>
+    <button id="refreshBtn" class="btn">Refresh</button>
+  </div>
+</header>
+<nav class="tabs" id="tabs" aria-label="Sections"><button data-tab="dash" class="on">Dashboard</button><button data-tab="logic">Logic</button></nav>
+
+<main id="tab-dash">
+  <section class="filters" id="filters" aria-label="Filters"></section>
+  <section class="kpis" id="kpis" aria-label="Key figures"></section>
+
+  <section class="card">
+    <div class="card-h"><h2>MTO journey</h2><span class="muted" id="journeyNote"></span></div>
+    <div id="journeyWarn"></div>
+    <div id="journey" class="journey"></div>
+  </section>
+
+
+  <section class="card">
+    <div class="card-h"><h2>MTO orders over time</h2>
+      <div class="seg" id="grain"><button data-g="day">Daily</button><button data-g="week">Weekly</button><button data-g="month" class="on">Monthly</button></div></div>
+    <div id="trend"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-h"><h2>Vendor performance</h2>
+      <div class="seg" id="vendorSort"><button data-s="pending" class="on">Highest pending</button><button data-s="delayPct">Highest delay</button><button data-s="total">Highest volume</button><button data-s="avgTat">Slowest</button></div></div>
+    <div id="vendors" class="scroll"></div>
+  </section>
+
+  <section class="card"><div class="card-h"><h2>Online vs Store MTO</h2></div><div id="compare" class="compare"></div></section>
+
+  <section class="card">
+    <div class="card-h"><h2>Orders needing action</h2><span class="muted" id="tableNote"></span></div>
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="Search order, customer, SKU, vendor, PO…" aria-label="Search orders">
+      <label class="check"><input type="checkbox" id="actionOnly" checked> Needs action only</label>
+      <div class="menu"><button class="btn" id="colBtn">Columns</button><div id="colMenu" class="menu-pop" hidden></div></div>
+      <button class="btn" id="exportBtn">Export CSV</button>
+    </div>
+    <div id="table" class="scroll"></div>
+    <div id="pager" class="pager"></div>
+  </section>
+</main>
+
+<main id="tab-logic" hidden>
+  <section class="card logic" id="logicBody"></section>
+</main>
+
+<div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal-backdrop" data-mclose></div>
+  <div class="modal-card">
+    <div class="modal-h"><h2 id="modalTitle"></h2><button class="btn" data-mclose>Close</button></div>
+    <div class="toolbar"><input id="mq" type="search" placeholder="Search within this list…" aria-label="Search within this list"><button class="btn" id="mExport">Export CSV</button></div>
+    <div id="modalBody" class="modal-body"></div>
+  </div>
+</div>
+
+<aside id="drawer" class="drawer" hidden aria-label="Order journey"></aside>
+<div id="tip" class="tip" hidden></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

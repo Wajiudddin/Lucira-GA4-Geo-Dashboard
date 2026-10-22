@@ -1,0 +1,71 @@
+/* ---------------------------------------------------------------------------
+   Scheme Dashboard — layout-only additions on top of style.css. Visual
+   identity (colors, fonts, card/button styling) now matches the rest of the
+   suite (Refill, Old Gold, Agent Performance) exactly, via the shared
+   tokens/rules in style.css. This file only adds what's unique to this page's
+   markup: the horizontal quick date-range bar above the page tabs.
+--------------------------------------------------------------------------- */
+
+.date-quickbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+/* The shared .option-btn is styled for a vertical dropdown list (transparent
+   border, left-aligned text) — reshape it into a horizontal pill button bar
+   for this specific row only, without touching .option-btn elsewhere. */
+.date-quickbar .option-btn {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  text-align: center;
+}
+
+.date-quickbar .option-btn:hover {
+  border-color: var(--accent);
+}
+
+.date-quickbar .option-btn.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.date-quickbar-custom {
+  align-items: center;
+  gap: 8px;
+}
+
+/* Must be display:none by default so the [hidden] attribute actually hides
+   it — an unconditional "display: flex" here would out-rank the browser's
+   own [hidden] rule (equal specificity, later in source order) and the
+   custom-range row would show up immediately instead of only after
+   clicking "Custom". */
+.date-quickbar-custom:not([hidden]) {
+  display: flex;
+}
+
+.date-quickbar-custom input[type="date"] {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.date-quickbar-custom .apply-filters-btn {
+  display: inline-block;
+  width: auto;
+  margin-bottom: 0;
+  padding: 7px 14px;
+}

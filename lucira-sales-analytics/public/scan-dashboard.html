@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Scan Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="scan-dashboard-style.css" />
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- ============================ Sidebar ============================ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-mark">Lucira</div>
+        <div class="sidebar-brand-sub">Scan Intelligence</div>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="sidebar-link is-active" data-panel="overviewPanel" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          Overview
+        </button>
+        <button class="sidebar-link" data-panel="scannedSoldPanel" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 6 9 17l-5-5"/></svg>
+          Scanned &amp; Sold
+        </button>
+        <button class="sidebar-link" data-panel="scannedNotSoldPanel" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg>
+          Attention Required
+        </button>
+        <button class="sidebar-link" data-panel="notScannedPanel" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="2.6"/><path d="M4 4l16 16" opacity="0"/></svg>
+          Never Scanned
+        </button>
+        <button class="sidebar-link" data-panel="customerPanel" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.5-4 4.5-6 7-6s5.5 2 7 6"/></svg>
+          Customer Analysis
+        </button>
+        <button class="sidebar-link" data-panel="logicPanel" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 11h1v6h1"/></svg>
+          Logic &amp; Data Quality
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        Source: <strong>BigQuery</strong><br />
+        Walkin_marge &middot; Pos.estimation_item_scan &middot; ds_imputed_reporting.items &middot; marketing_sale &middot; Live_inventory
+      </div>
+    </aside>
+
+    <!-- ============================ Main ============================ -->
+    <main class="main-content">
+      <header class="top-header">
+        <button class="sidebar-collapse-btn" id="sidebarToggle" type="button" aria-label="Toggle menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="top-header-title">
+          <h1>Scan Dashboard</h1>
+          <p>Walk-in &rarr; Scan &rarr; Sale customer journey</p>
+        </div>
+        <div class="top-header-actions">
+          <span class="updated-at" id="updatedAt"></span>
+          <button class="btn btn-primary" id="refreshBtn" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <div id="statusBar" class="status-bar" hidden></div>
+
+      <!-- ============================ Global Filters ============================ -->
+      <div class="filter-row" id="globalFilterRow">
+        <div class="filter-pill filter-pill--dates">
+          <input type="date" id="dateFromInput" class="date-input" aria-label="From date" />
+          <span class="date-sep">&ndash;</span>
+          <input type="date" id="dateToInput" class="date-input" aria-label="To date" />
+        </div>
+        <div class="filter-pill" id="storeMultiselect">
+          <button type="button" class="filter-pill-btn" id="storeToggle">Store <span class="chev">&#9662;</span></button>
+          <div class="filter-pill-panel" id="storePanel" hidden></div>
+        </div>
+        <div class="filter-pill" id="categoryMultiselect">
+          <button type="button" class="filter-pill-btn" id="categoryToggle">Category <span class="chev">&#9662;</span></button>
+          <div class="filter-pill-panel" id="categoryPanel" hidden></div>
+        </div>
+        <div class="filter-pill" id="collectionMultiselect">
+          <button type="button" class="filter-pill-btn" id="collectionToggle">Collection <span class="chev">&#9662;</span></button>
+          <div class="filter-pill-panel" id="collectionPanel" hidden></div>
+        </div>
+        <div class="filter-pill" id="priceBandMultiselect">
+          <button type="button" class="filter-pill-btn" id="priceBandToggle">Price Band <span class="chev">&#9662;</span></button>
+          <div class="filter-pill-panel" id="priceBandPanel" hidden></div>
+        </div>
+        <div class="filter-pill" id="sizeMultiselect">
+          <button type="button" class="filter-pill-btn" id="sizeToggle">Size <span class="chev">&#9662;</span></button>
+          <div class="filter-pill-panel" id="sizePanel" hidden></div>
+        </div>
+        <input type="text" id="skuSearchInput" class="search-input" placeholder="Search item code, SKU, product name..." style="min-width:220px;" />
+        <button class="reset-filters-btn" id="globalResetFilters" type="button">Reset filters</button>
+      </div>
+      <p class="filter-note">Date/Store/Category/Collection/Price Band/Size/SKU filters apply consistently to every KPI, chart, and table below. Category/Collection/Price Band/Size/SKU only affect product-level data (Scans, Sales, Never Scanned) — Walk-ins have no product association, so they respond to Date and Store only. Size covers both ring sizes and bracelet sizes (and any other sized product) — combine it with the Category filter to see, for example, which ring sizes scan and sell the most.</p>
+
+      <!-- ============================ Overview ============================ -->
+      <section class="tab-panel is-active" id="overviewPanel">
+        <div id="kpiGrid" class="kpi-grid"></div>
+
+        <div class="funnel-card">
+          <div class="section-heading" style="margin:0 0 6px;">
+            <h2>Walk-in &rarr; Scan &rarr; Sale</h2>
+            <p>See Logic &amp; Data Quality for exactly how each stage is computed.</p>
+          </div>
+          <div class="funnel-row" id="funnelRow"></div>
+        </div>
+
+        <div class="section-heading">
+          <h2>Weekly Trend</h2>
+          <div class="segmented" id="trendRangeControl">
+            <button class="segmented-btn" data-weeks="8">8W</button>
+            <button class="segmented-btn" data-weeks="26">26W</button>
+            <button class="segmented-btn is-active" data-weeks="0">All</button>
+          </div>
+        </div>
+        <div class="charts-grid" id="trendChartsGrid"></div>
+
+        <div class="section-heading">
+          <h2>By Store</h2>
+          <p>Scan activity and sales value at each store</p>
+        </div>
+        <div class="charts-grid">
+          <div class="card">
+            <div class="card-header"><div><div class="card-title">Scan Events by Store</div><div class="card-subtitle">Every scan, including repeats</div></div></div>
+            <div id="scansByStoreChart" class="bar-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div><div class="card-title">Sales Value by Store</div><div class="card-subtitle">Of products scanned &amp; sold at that store</div></div></div>
+            <div id="revenueByStoreChart" class="bar-list"></div>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <h2>Funnel by Store</h2>
+          <p>Scanned/Sold figures below are scoped to that store — a scan is only "sold" if the matching sale happened at the same store. An item or visitor seen at more than one store counts once per store, so the TOTAL row's "Unique Products Scanned"/"Products Sold"/"Unique Visitors" can exceed the Overview KPI's single business-wide count.</p>
+        </div>
+        <div class="table-shell">
+          <div class="table-scroll">
+            <table class="grid" id="funnelTable">
+              <thead>
+                <tr>
+                  <th class="sticky-col">Store</th>
+                  <th>Walk-ins</th>
+                  <th>Unique Visitors</th>
+                  <th>Scan Events</th>
+                  <th>Unique Products Scanned</th>
+                  <th>Products Sold</th>
+                  <th>Sales Value</th>
+                </tr>
+              </thead>
+              <tbody id="funnelBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <button class="export-link" data-export-table="funnelTable" data-export-filename="scan-funnel-by-store">Export CSV &darr;</button>
+      </section>
+
+      <!-- ============================ Scanned & Sold ============================ -->
+      <section class="tab-panel" id="scannedSoldPanel">
+        <div class="section-heading" style="margin-top:0;">
+          <h2>Scanned &amp; Sold</h2>
+          <p>Scanned products with a valid, same-store sale (matched on item_line_no)</p>
+        </div>
+
+        <div id="scannedSoldKpiGrid" class="kpi-grid"></div>
+
+        <div class="charts-grid">
+          <div class="card">
+            <div class="card-header"><div class="card-title">By Store</div></div>
+            <div id="scannedSoldStoreContainer"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">By Category</div></div>
+            <div id="scannedSoldCategoryContainer"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">By Price Band</div></div>
+            <div id="scannedSoldPriceBandContainer"></div>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <h2>Sold at More Than One Store</h2>
+          <p>Same product, sold at 2 or more different stores — each store's own sale counted once (no double-counting across stores)</p>
+        </div>
+        <div class="table-shell">
+          <div class="table-scroll">
+            <table class="grid" id="multiStoreSoldTable">
+              <thead>
+                <tr>
+                  <th class="sticky-col">SKU</th>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>Stores Sold At</th>
+                  <th>Total Scan Count</th>
+                  <th>Total Qty Sold</th>
+                  <th>Total Sales Value</th>
+                </tr>
+              </thead>
+              <tbody id="multiStoreSoldBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <h2>Scanned &amp; Sold Products</h2>
+        </div>
+        <div class="table-toolbar">
+          <input type="text" id="scannedSoldSearch" class="search-input" placeholder="Search item code, SKU, name, category, store..." />
+        </div>
+        <div id="scannedSoldTableContainer"></div>
+      </section>
+
+      <!-- ============================ Attention Required (Scanned but Not Sold) ============================ -->
+      <section class="tab-panel" id="scannedNotSoldPanel">
+        <div class="section-heading" style="margin-top:0;">
+          <h2>Attention Required</h2>
+          <p>Products scanned in-store that have no matching sale (same item_line_no, same store)</p>
+        </div>
+
+        <div id="scannedNotSoldKpiGrid" class="kpi-grid"></div>
+
+        <div class="section-heading" style="margin-top:0;">
+          <h2>Top 10 Most Scanned (Not Sold)</h2>
+          <p>Highest-interest products with no matching sale yet — worth checking whether they need a price, placement, or staffing fix</p>
+        </div>
+        <div class="table-shell">
+          <div class="table-scroll">
+            <table class="grid" id="scannedNotSoldTopTable">
+              <thead>
+                <tr>
+                  <th class="sticky-col">#</th>
+                  <th>SKU</th>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>Store(s) Scanned</th>
+                  <th>Scan Count</th>
+                </tr>
+              </thead>
+              <tbody id="scannedNotSoldTopBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="card">
+            <div class="card-header"><div><div class="card-title">By Store</div><div class="card-subtitle">An item scanned at 2 stores appears as 2 separate rows below, one per store</div></div></div>
+            <div id="scannedNotSoldStoreContainer"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">By Category</div></div>
+            <div id="scannedNotSoldCategoryContainer"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">By Price Band</div></div>
+            <div id="scannedNotSoldPriceBandContainer"></div>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <h2>Scanned but Not Sold</h2>
+        </div>
+        <div class="table-toolbar">
+          <input type="text" id="scannedNotSoldSearch" class="search-input" placeholder="Search item code, SKU, name, category, store..." />
+        </div>
+        <div id="scannedNotSoldTableContainer"></div>
+      </section>
+
+      <!-- ============================ Never Scanned ============================ -->
+      <section class="tab-panel" id="notScannedPanel">
+        <div class="section-heading" style="margin-top:0;">
+          <h2>Never Scanned</h2>
+          <p>Live inventory (in stock) with zero scan activity on record</p>
+        </div>
+
+        <div id="notScannedKpiGrid" class="kpi-grid"></div>
+
+        <div class="charts-grid">
+          <div class="card">
+            <div class="card-header"><div class="card-title">By Store</div></div>
+            <div id="notScannedStoreContainer"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">By Category</div></div>
+            <div id="notScannedCategoryContainer"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">By Price Band</div></div>
+            <div id="notScannedPriceBandContainer"></div>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <h2>Items Never Scanned</h2>
+        </div>
+        <div class="table-toolbar">
+          <input type="text" id="notScannedSearch" class="search-input" placeholder="Search item code, SKU, name, category, store..." />
+        </div>
+        <div id="notScannedTableContainer"></div>
+      </section>
+
+      <!-- ============================ Customer Analysis ============================ -->
+      <section class="tab-panel" id="customerPanel">
+        <div class="section-heading" style="margin-top:0;">
+          <h2>Customer Analysis</h2>
+          <p>Customer &rarr; Products Scanned &rarr; Products Purchased, keyed by party_id (the only reliable non-name customer identifier scan rows carry)</p>
+        </div>
+
+        <div id="customerKpiGrid" class="kpi-grid"></div>
+
+        <div class="table-toolbar">
+          <input type="text" id="customerSearch" class="search-input" placeholder="Search customer name or ID..." />
+        </div>
+        <div id="customerTableContainer"></div>
+      </section>
+
+      <!-- ============================ Logic & Data Quality ============================ -->
+      <section class="tab-panel" id="logicPanel">
+        <div class="logic-card">
+          <h2>How This Dashboard Works</h2>
+          <ol>
+            <li><strong>Walk-ins</strong> = every store visit we have on record.</li>
+            <li><strong>Scan Events</strong> = every time a product was scanned, counted one by one. Scanning the same product 5 times counts as 5.</li>
+            <li><strong>Unique Products Scanned</strong> = how many different products were scanned, no matter how many times each one was scanned.</li>
+            <li><strong>Scanned &amp; Sold</strong> = a product was scanned, and later actually sold <em>at that same store</em>. A sale at a different store doesn't count.</li>
+            <li><strong>Scanned but Not Sold</strong> = a product was scanned, but never sold.</li>
+            <li><strong>Never Scanned</strong> = a product currently in stock that has never been scanned, at any store.</li>
+            <li>If a product sits in stock at more than one store, each store's stock is shown as its own row, with its own age and price — so the numbers for each store stay accurate.</li>
+            <li><strong>Customer Analysis</strong> only shows customers we can identify by a customer ID. Most scans don't carry one, so this view covers a smaller, partial slice of all scans — not everyone who scanned something.</li>
+            <li>Filters (Date, Store, Category, Collection, Price Band, Search) update every number and chart on this dashboard together. Walk-ins only respond to Date and Store, since a walk-in isn't tied to a specific product.</li>
+            <li>Data refreshes every 15 minutes, or click Refresh for the latest right away.</li>
+          </ol>
+          <div class="logic-flow">
+            <div class="logic-flow-step">Walk-ins</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">Scans</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">Sales</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">Never Scanned (stock that was never scanned)</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scan-dashboard.js"></script>
+</body>
+</html>

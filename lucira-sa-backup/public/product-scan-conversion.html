@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Product Scan &amp; Conversion Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="product-scan-conversion-style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <header class="app-header">
+      <div>
+        <h1>PRODUCT SCAN &amp; CONVERSION DASHBOARD</h1>
+        <p class="subtitle">BigQuery &middot; walk-ins (Walkin_marge) &middot; scans (Pos.estimation_item_scan &times; Live_inventory) &middot; sales (marketing_sale) &middot; <a class="nav-link" href="index.html">Deals Dashboard &rarr;</a></p>
+      </div>
+      <div class="header-actions">
+        <span id="updatedAt" class="updated-at"></span>
+        <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+        <button id="refreshBtn" class="refresh-btn">Refresh</button>
+      </div>
+    </header>
+
+    <div id="statusBar" class="status-bar" hidden></div>
+
+    <!-- ============================ Global Filters ============================ -->
+    <div class="filters-bar psc-filters-bar">
+      <div class="filter-group">
+        <div class="filter-section-title">Date range</div>
+        <div class="filters-bar-dates" style="display:flex;">
+          <label for="startDate">From</label>
+          <input type="date" id="startDate" />
+          <label for="endDate">To</label>
+          <input type="date" id="endDate" />
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-section-title">Store</div>
+        <div class="multiselect" id="storeMultiselect">
+          <button type="button" class="multiselect-toggle" id="storeToggle">All stores</button>
+          <div class="multiselect-panel" id="storePanel" hidden></div>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-section-title">Category</div>
+        <div class="multiselect" id="categoryMultiselect">
+          <button type="button" class="multiselect-toggle" id="categoryToggle">All categories</button>
+          <div class="multiselect-panel" id="categoryPanel" hidden></div>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-section-title">Price Band</div>
+        <div class="multiselect" id="priceBandMultiselect">
+          <button type="button" class="multiselect-toggle" id="priceBandToggle">All price bands</button>
+          <div class="multiselect-panel" id="priceBandPanel" hidden></div>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-section-title">Metal</div>
+        <div class="multiselect" id="metalMultiselect">
+          <button type="button" class="multiselect-toggle" id="metalToggle">All metals</button>
+          <div class="multiselect-panel" id="metalPanel" hidden></div>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-section-title">Size</div>
+        <div class="multiselect" id="sizeMultiselect">
+          <button type="button" class="multiselect-toggle" id="sizeToggle">All sizes</button>
+          <div class="multiselect-panel" id="sizePanel" hidden></div>
+        </div>
+      </div>
+
+      <div class="filter-group psc-filter-group--grow">
+        <div class="filter-section-title">SKU / Item</div>
+        <input type="text" id="skuSearch" class="table-search psc-sku-search" placeholder="Search item code, SKU, name..." />
+      </div>
+
+      <button type="button" id="resetFilters" class="apply-filters-btn">Reset Filters</button>
+    </div>
+
+    <!-- ============================ Row 1 — KPI Cards ============================ -->
+    <div id="kpiSections"></div>
+
+    <!-- ============================ Row 2 — Funnel ============================ -->
+    <h2 class="table-heading">Walk-in &rarr; Scan &rarr; Sale Funnel</h2>
+    <div id="funnelContainer" class="psc-funnel-container"></div>
+
+    <!-- ============================ Row 3 — Trend ============================ -->
+    <h2 class="table-heading">Daily Trend</h2>
+    <div class="charts-grid">
+      <div id="trendCountsChart"></div>
+      <div id="trendConversionChart"></div>
+    </div>
+
+    <!-- ============================ Row 4 — Price Band ============================ -->
+    <h2 class="table-heading">Performance by Price Band</h2>
+    <div id="priceBandTableContainer"></div>
+    <div class="charts-grid" id="priceBandChartsGrid"></div>
+
+    <!-- ============================ Row 5 — Category ============================ -->
+    <h2 class="table-heading">Performance by Category</h2>
+    <div id="categoryTableContainer"></div>
+    <div class="charts-grid" id="categoryChartsGrid"></div>
+
+    <!-- ============================ Row 6 — Ageing ============================ -->
+    <h2 class="table-heading">Unscanned Product Ageing</h2>
+    <div id="ageingKpiGrid" class="kpi-grid"></div>
+    <div class="charts-grid">
+      <div id="ageingDistChart"></div>
+    </div>
+    <h3 class="table-heading" style="font-size:13px;">Top 10 Oldest Unscanned Products</h3>
+    <div class="table-wrap table-wrap--spaced">
+      <table class="report-table" id="topOldestTable">
+        <thead>
+          <tr><th>SKU</th><th>Product</th><th>Category</th><th>Price</th><th>Price Band</th><th>Age</th><th>Store</th></tr>
+        </thead>
+        <tbody id="topOldestBody"></tbody>
+      </table>
+    </div>
+
+    <!-- ============================ Row 7 — Product Tables ============================ -->
+    <h2 class="table-heading">Product Drill-Down</h2>
+    <div class="psc-tables-grid">
+      <div>
+        <h3 class="table-heading" style="font-size:14px;">Scanned but Not Sold</h3>
+        <div id="scannedNotSoldKpiGrid" class="kpi-grid"></div>
+        <input type="text" id="scannedNotSoldSearch" class="table-search" placeholder="Search item code, SKU, name..." />
+        <div id="scannedNotSoldTableContainer"></div>
+      </div>
+      <div>
+        <h3 class="table-heading" style="font-size:14px;">Not Scanned Products</h3>
+        <input type="text" id="notScannedSearch" class="table-search" placeholder="Search item code, SKU, name..." />
+        <div id="notScannedTableContainer"></div>
+      </div>
+    </div>
+
+    <!-- ============================ Logic ============================ -->
+    <div class="logic-box">
+      <h2 class="logic-box-title">DASHBOARD LOGIC &amp; DEFINITIONS</h2>
+      <div class="logic-box-columns">
+        <ol class="logic-list">
+          <li><strong>Walk-ins</strong> come from Walkin_marge, one row per store visit (checked directly: every row is already a distinct phone+date+store combination, so repeat rows are genuine repeat visits, not duplicates). <strong>Total Walk-ins</strong> = distinct customers (by phone; rows with no phone each count as their own visit). <strong>Visit events</strong> = raw row count, shown as a secondary figure.</li>
+          <li><strong>Scans</strong> come from Pos.estimation_item_scan, matched to a product via Live_inventory on item_id (checked directly: item_id, item_code and Full_sku are effectively 1:1, so this is already an exact-variant match — no separate size/metal collapsing risk). The scan table's own "sku" column is a different, unrelated id and is not used for matching.</li>
+          <li><strong>Sales</strong> come from marketing_sale, matched to a scanned product by <code>Full_sku</code> (the single matching field — change it in one place, <code>SALE_MATCH_FIELD</code> in productScanConversionService.js, if the SKU convention differs later).</li>
+          <li><strong>Classification</strong>: scanned &amp; sold &rarr; Scanned &amp; Sold; scanned &amp; not sold &rarr; Scanned but Not Sold; in Live_inventory but never scanned &rarr; Not Scanned. A product sold only through a channel that never logs a scan (e.g. online) is still "Not Scanned" by this rule, as specified.</li>
+          <li>"Customers who scanned" is <strong>not shown</strong> — Walkin_marge (phone) and estimation_item_scan (item_id, sparsely populated party_id) share no reliable common customer key, so a per-customer walk-in&rarr;scan link cannot be verified from this data.</li>
+          <li><strong>Scan Rate</strong> (top funnel) = Scan events &divide; Walk-ins &times; 100 — a store-level engagement measure, not a verified per-customer conversion. <strong>Scan-to-Sale %</strong> = Scanned &amp; Sold products &divide; Scanned products &times; 100.</li>
+          <li>In the <strong>Price Band / Category tables</strong>, "Scan Rate" means something more specific: Scanned &divide; Inventory for that band/category (i.e. the share of that segment's stock that has ever been scanned) — labelled the same as the spec but clarified via the (i) tooltip and the note under each table.</li>
+          <li><strong>Price Band</strong> reuses marketing_sale's own existing <code>Price_Range</code> buckets (confirmed directly against the data) rather than a new scheme, per "use the existing business definition if one exists". <strong>Category</strong> = Live_inventory's item_group_name. <strong>Metal</strong> = metal_name. <strong>Size</strong> = item_size_name.</li>
+          <li><strong>Ageing</strong> = today &minus; Live_inventory.document_date (earliest stock-ledger unit on record for that item_id) &mdash; the only field on Live_inventory that represents when a unit entered stock.</li>
+          <li>Store codes are canonicalised so the same physical store never appears twice under different labels: Live_inventory/estimation_item_scan resolve company_id via the same store map used elsewhere in this app; Walkin_marge's own "FCS" rows are folded into "HWI" (the code marketing_sale/Live_inventory already use for that store). Walkin_marge also contains an "Amazon" store_code (an online channel logged through the same event) — kept as its own filterable value rather than dropped.</li>
+          <li>Every filter (Date, Store, Category, Price Band, SKU, Metal, Size) is applied client-side against one BigQuery-sourced payload fetched on load/refresh — nothing here is static or manually entered. A scanned or sold item with no current Live_inventory match (sold out / discontinued) is excluded once any Category/Price Band/Metal/Size/SKU filter is active, since its attributes can't be confirmed.</li>
+          <li>Data refreshes every 15 minutes server-side, or click Refresh for the latest right away.</li>
+        </ol>
+        <div class="logic-flow">
+          <div class="logic-flow-step">WALKIN_MARGE (visits, by phone)</div>
+          <div class="logic-flow-arrow">&darr;</div>
+          <div class="logic-flow-step">ESTIMATION_ITEM_SCAN &times; LIVE_INVENTORY (scans, by item_id)</div>
+          <div class="logic-flow-arrow">&darr;</div>
+          <div class="logic-flow-step">MARKETING_SALE (sales, matched by Full_sku)</div>
+          <div class="logic-flow-arrow">&darr;</div>
+          <div class="logic-flow-step">CLASSIFIED: SCANNED &amp; SOLD / SCANNED NOT SOLD / NOT SCANNED</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="product-scan-conversion.js"></script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Store Performance Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="store-performance-style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+  <div class="viz-root sp-root">
+    <header class="sp-header">
+      <div class="sp-header-titles">
+        <div class="sp-brand-eyebrow">LUCIRA JEWELRY</div>
+        <h1>Store Performance</h1>
+        <p class="sp-subtitle">Store Performance &amp; Customer Journey Analytics</p>
+      </div>
+      <div class="sp-header-right">
+        <nav class="sp-nav" id="mainNav">
+          <button type="button" class="sp-nav-link is-active" data-tab="dashboard">Dashboard</button>
+          <button type="button" class="sp-nav-link" data-tab="logic">Logic</button>
+        </nav>
+        <div class="sp-header-actions">
+          <span id="updatedAt" class="sp-updated-at"><span class="sp-status-dot" aria-hidden="true"></span><span id="updatedAtText"></span></span>
+          <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+          <button id="refreshBtn" class="sp-refresh-btn" type="button">Refresh</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="dashboardTab">
+      <div id="freshnessBanner" class="freshness-banner" hidden></div>
+      <div id="statusBar" class="status-bar" hidden></div>
+
+      <div class="sp-filterbar" id="controlsWrap" hidden>
+        <div class="sp-control">
+          <label class="sp-control-label" id="storeMultiSelectLabel">Store</label>
+          <div class="sp-multiselect" id="storeMultiSelect">
+            <button type="button" class="sp-select sp-multiselect-trigger" id="storeMultiSelectTrigger"
+              aria-haspopup="listbox" aria-expanded="false" aria-labelledby="storeMultiSelectLabel"></button>
+            <div class="sp-multiselect-panel" id="storeMultiSelectPanel" role="listbox" aria-multiselectable="true" hidden></div>
+          </div>
+        </div>
+        <div class="sp-control">
+          <label class="sp-control-label" for="periodToggle">Period</label>
+          <div class="sp-segmented" id="periodToggle" role="tablist" aria-label="Comparison period"></div>
+        </div>
+        <div class="sp-period-dates" id="periodDates"></div>
+      </div>
+
+      <div id="skeletonWrap" class="sp-skeleton" hidden>
+        <div class="sp-skeleton-cards">
+          <div class="sp-skeleton-card"></div>
+          <div class="sp-skeleton-card"></div>
+          <div class="sp-skeleton-card"></div>
+          <div class="sp-skeleton-card"></div>
+        </div>
+        <div class="sp-skeleton-band"></div>
+        <div class="sp-skeleton-row"></div>
+        <div class="sp-skeleton-row"></div>
+        <div class="sp-skeleton-row"></div>
+        <div class="sp-skeleton-row"></div>
+        <div class="sp-skeleton-row"></div>
+      </div>
+
+      <div id="content"></div>
+    </div>
+
+    <div id="logicTab" hidden>
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">How It Works</h2>
+        </div>
+        <p class="logic-p">
+          This page loads one API call, which pulls every store, every metric, and all three comparison periods from
+          BigQuery and the Zoho CRM API in one go. Switching Store, Period, or this tab just re-renders data already
+          loaded — it never re-queries. Results are cached for 15 minutes.
+        </p>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">Store Mapping</h2>
+          <p class="sp-section-desc">Each store is identified by a different field per source.</p>
+        </div>
+        <div class="table-wrap">
+          <table class="report-table">
+            <thead><tr><th>Store</th><th>Calls / Meetings</th><th>Walkins / Orders code</th><th>Inventory name</th><th>GA4 city group</th></tr></thead>
+            <tbody>
+              <tr><td>Borivali Mumbai</td><td>Borivali Team</td><td>BO1</td><td>Sky City Borivali CoCo Store</td><td rowspan="2">Mumbai (shared)</td></tr>
+              <tr><td>Chembur Mumbai</td><td>Chembur Store</td><td>CS1</td><td>HWI VENTURES</td></tr>
+              <tr><td>Pune</td><td>Pune Store</td><td>PN1</td><td>JM Pune CoCo Store</td><td>Pune</td></tr>
+              <tr><td>Paschim Vihar Delhi</td><td>Pashchim Vihar</td><td>PV1</td><td>Paschim Vihar Lucira Jewelry</td><td rowspan="2">Delhi (shared)</td></tr>
+              <tr><td>Lajpat Nagar Delhi</td><td>Lajpat Nagar Store</td><td>LPN</td><td>Lagpat Nagar Delhi, Lucira Jewelry</td></tr>
+              <tr><td>Noida Delhi</td><td>Noida Store</td><td>N18</td><td>Noida Sector 18 CoCo Store</td><td>Noida (separate)</td></tr>
+              <tr><td>Malleshwaram Bengaluru <span class="logic-pending-cell">(partial)</span></td><td>Malleshwaram Store</td><td>&mdash;</td><td>&mdash;</td><td>Bengaluru (separate)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="logic-p logic-note">
+          GA4 only reports a <code>city</code>, not a store, so Borivali/Chembur share one "Mumbai" figure and Paschim
+          Vihar/Lajpat Nagar share one "Delhi" figure for every GA4 metric (City/Paid/Retargeting/Communication
+          Sessions) — this is labelled on-screen. Noida and Malleshwaram each have their own distinct city value and
+          are never merged with another store.
+        </p>
+        <p class="logic-p logic-note">
+          <strong>Malleshwaram has no store code in Walkins/Orders/Revenue or an entry in Inventory</strong> (verified
+          directly — those systems simply don't track this location), so those 4 metrics show "Data unavailable" for
+          it specifically, not a fabricated 0. Sessions, Deals, Meetings Raised, Calls, and Spend are all real for this
+          store, the same as any other.
+        </p>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">Comparison Periods</h2>
+          <p class="sp-section-desc">Calculated dynamically from the current date in Asia/Kolkata (IST) — nothing is hardcoded.</p>
+        </div>
+        <div class="table-wrap">
+          <table class="report-table">
+            <thead><tr><th>Period</th><th>Definition</th></tr></thead>
+            <tbody>
+              <tr><td>Yesterday</td><td>Today &minus; 1 day &mdash; <strong>except</strong> City/Paid/Retargeting/Communication Sessions, which use today &minus; 2, by request.</td></tr>
+              <tr><td>Last Week</td><td>Previous full calendar week, Monday&ndash;Sunday.</td></tr>
+              <tr><td>Last Month</td><td>Previous full calendar month.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="logic-p logic-note">
+          Wherever a GA4 metric's date differs from the rest of the dashboard, the card is labelled "As of [date]" so
+          it's never mistaken for the same day. Each period is an independent total (a sum), not a daily average —
+          Last Month being roughly 4&times; Last Week is expected.
+        </p>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">Metric Definitions</h2>
+        </div>
+        <div class="table-wrap">
+          <table class="report-table logic-metrics-table">
+            <thead><tr><th>Metric</th><th>Source</th><th>Calculation</th><th>Store mapping</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>City Sessions</td>
+                <td><code>analytics_478308692.events_*</code> (linked GA4 export)</td>
+                <td>Distinct sessions, city in Mumbai/Delhi/Pune/Noida</td>
+                <td>GA4 city &rarr; store(s)</td>
+                <td>Verified against GA4's own reported numbers.</td>
+              </tr>
+              <tr>
+                <td>Paid Sessions</td>
+                <td>Same GA4 export</td>
+                <td>Sessions with Google/Meta paid or broadcast/trigger source</td>
+                <td>Same as City Sessions</td>
+                <td>Excludes organic and referral traffic.</td>
+              </tr>
+              <tr>
+                <td>Retargeting Sessions</td>
+                <td>Same GA4 export</td>
+                <td>Sessions with an RTB/Criteo source</td>
+                <td>Same as City Sessions</td>
+                <td>&mdash;</td>
+              </tr>
+              <tr>
+                <td>Communication Sessions</td>
+                <td>Same GA4 export</td>
+                <td>Sessions with a broadcast/trigger source</td>
+                <td>Same as City Sessions</td>
+                <td>Can overlap with Paid Sessions by design.</td>
+              </tr>
+              <tr>
+                <td>Deals <span class="logic-pending-cell">(approximation)</span></td>
+                <td>Zoho CRM API &mdash; Deals module (live)</td>
+                <td>Deals created, by city, split evenly across stores sharing that city</td>
+                <td>City (Address_City), not a per-store field</td>
+                <td>Zoho Deals has no store field at all, so this is a disclosed city-split estimate, flagged with a badge wherever it's shown.</td>
+              </tr>
+              <tr>
+                <td>Meetings Raised <span class="logic-pending-cell">(sync caveat)</span></td>
+                <td><code>zoho_crm.cdc_meetings</code> (BigQuery)</td>
+                <td>Meetings created</td>
+                <td>Owner &rarr; store, with venue-text fallback</td>
+                <td>This table can lag or mismatch live Zoho by a day; live-API access is blocked pending a Zoho OAuth scope change. Meetings from individual agents not logged under a store account are excluded.</td>
+              </tr>
+              <tr>
+                <td>Walkins</td>
+                <td><code>ds_imputed_reporting.Walkin_marge</code></td>
+                <td>Count of walk-in rows</td>
+                <td>store_code</td>
+                <td>&mdash;</td>
+              </tr>
+              <tr>
+                <td>Orders</td>
+                <td><code>ds_imputed_reporting.marketing_sale</code></td>
+                <td>Distinct in-store orders (Channel = 'Store')</td>
+                <td>company_code</td>
+                <td>Excludes online orders.</td>
+              </tr>
+              <tr>
+                <td>Revenue</td>
+                <td>Same as Orders</td>
+                <td>Sum of net sale value</td>
+                <td>company_code</td>
+                <td>&mdash;</td>
+              </tr>
+              <tr>
+                <td>Store Calls Dialed</td>
+                <td>Zoho CRM API &mdash; Calls module (live)</td>
+                <td>Outbound calls</td>
+                <td>Owner &rarr; store</td>
+                <td>Live API used instead of BigQuery, which was found to lag by days.</td>
+              </tr>
+              <tr>
+                <td>Connected Calls</td>
+                <td>Zoho CRM API &mdash; Calls module</td>
+                <td>Calls with an actual two-way conversation status</td>
+                <td>Owner &rarr; store</td>
+                <td>&mdash;</td>
+              </tr>
+              <tr>
+                <td>Connected Calls &gt; 30 Seconds</td>
+                <td>Zoho CRM API &mdash; Calls module</td>
+                <td>Connected calls lasting &gt; 30s</td>
+                <td>Owner &rarr; store</td>
+                <td>&mdash;</td>
+              </tr>
+              <tr>
+                <td>Store Talktime</td>
+                <td>Zoho CRM API &mdash; Calls module</td>
+                <td>Sum of connected call duration</td>
+                <td>Owner &rarr; store</td>
+                <td>Shown as "Xh Ym Zs".</td>
+              </tr>
+              <tr>
+                <td>GMB Strength</td>
+                <td>Google Business Profile (<code>mybusinessbusinessinformation.googleapis.com</code>)</td>
+                <td>0&ndash;10 completeness score computed by this app</td>
+                <td>Location &rarr; store (direct)</td>
+                <td>Not an official Google metric &mdash; counts how many of 6 profile fields (phone, address, website, hours, categories, description) are filled in. Live snapshot, same across all periods.</td>
+              </tr>
+              <tr>
+                <td>Lifetime Google Reviews</td>
+                <td>Google Business Profile (<code>mybusiness.googleapis.com/v4</code> reviews)</td>
+                <td><code>totalReviewCount</code></td>
+                <td>Location &rarr; store (direct)</td>
+                <td>Live snapshot, same across all periods. Verified against the public Google Maps listing (e.g. Chembur: 260 &mdash; exact match).</td>
+              </tr>
+              <tr>
+                <td>Google Rating</td>
+                <td>Google Business Profile (<code>mybusiness.googleapis.com/v4</code> reviews)</td>
+                <td><code>averageRating</code></td>
+                <td>Location &rarr; store (direct)</td>
+                <td>Live snapshot, same across all periods. Verified against the public Google Maps listing (e.g. Chembur: 4.9 &mdash; exact match).</td>
+              </tr>
+              <tr>
+                <td>Store Direction Clicks</td>
+                <td>Google Business Profile (<code>businessprofileperformance.googleapis.com</code>)</td>
+                <td><code>BUSINESS_DIRECTION_REQUESTS</code>, real per-day counts</td>
+                <td>Location &rarr; store (direct)</td>
+                <td>Google's performance data lags ~2&ndash;3 days &mdash; the most recent day or two may read low/zero because Google hasn't finished processing it yet, not because nothing happened.</td>
+              </tr>
+              <tr>
+                <td>Store Calls Clicked</td>
+                <td>Google Business Profile (<code>businessprofileperformance.googleapis.com</code>)</td>
+                <td><code>CALL_CLICKS</code>, real per-day counts</td>
+                <td>Location &rarr; store (direct)</td>
+                <td>Counts taps on the listing's "Call" button, not completed/answered phone calls &mdash; Google doesn't expose actual call volume. Same ~2&ndash;3 day processing lag as Direction Clicks.</td>
+              </tr>
+              <tr>
+                <td>Inventory</td>
+                <td><code>ds_imputed_reporting.Live_inventory</code></td>
+                <td>Sum of saleable pieces ('Finish Goods')</td>
+                <td>Store_name</td>
+                <td>Live snapshot, same across all periods.</td>
+              </tr>
+              <tr>
+                <td>Number of Staff</td>
+                <td><code>store_performance_app_data.store_staff_counts</code> (manually entered)</td>
+                <td>Whatever count was last typed in for that store</td>
+                <td>Direct per-store input, no query</td>
+                <td>No HR/staffing source table exists in the project — this is a plain editable field on the dashboard itself, not pulled from anywhere. Blank until entered, never a fabricated 0. Live snapshot, same across all periods.</td>
+              </tr>
+              <tr>
+                <td>Spend <span class="logic-pending-cell">(partial attribution)</span></td>
+                <td><code>ds_imputed_reporting.ads_spend_live_city_daily</code> (Google Ads + Meta Ads combined)</td>
+                <td>Cost of campaigns whose name tags a specific city/store, on either platform</td>
+                <td>Campaign name keyword &rarr; store(s) (a campaign naming several stores splits evenly across all of them)</td>
+                <td>Only city/store-tagged campaigns count on either platform — most spend runs pan-India with no city signal and is excluded from every total, including "All Stores." Name-based, not a verified targeting field. Reconciled against the prior Google-only source (0.02% difference, normal rounding); Meta is fresh through the same day as Google here, no reporting lag. This table's own city/city_attributed columns are deliberately not used — that field is where a click came from, not what the campaign was built for (verified: a single pan-India campaign shows real "city" rows for 100+ Indian cities with no Lucira store).</td>
+              </tr>
+              <tr>
+                <td>Cost Per Session</td>
+                <td colspan="3">Spend / City Sessions</td>
+                <td>Inherits Spend's partial attribution.</td>
+              </tr>
+              <tr>
+                <td>Cost Per Deal</td>
+                <td colspan="3">Spend / Deals</td>
+                <td>Inherits Spend's and Deals' approximations.</td>
+              </tr>
+              <tr>
+                <td>Cost Per Appointment</td>
+                <td colspan="3">Spend / Meetings Raised</td>
+                <td>Inherits Spend's partial attribution and Meetings' sync caveat.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-section-head">
+          <h2 class="sp-section-title">Key Caveats</h2>
+        </div>
+        <ul class="logic-list">
+          <li><strong>Calls and Deals are live from Zoho</strong>, not BigQuery — their BigQuery copies were found to lag by days. Everything else comes from BigQuery.</li>
+          <li><strong>Deals is a city-level approximation</strong>, split evenly across stores sharing a city, since Zoho Deals has no store field.</li>
+          <li><strong>Meetings Raised can be a day stale</strong> and excludes agents not logged under a store account — a live-API fix is blocked by Zoho OAuth scope.</li>
+          <li><strong>Spend combines Google Ads and Meta Ads from one table</strong> (<code>ds_imputed_reporting.ads_spend_live_city_daily</code>) — only campaigns tagged with a city/store by name count on either platform (most ad spend runs pan-India with no city signal and is excluded everywhere), so Spend and the 3 Cost-Per-X metrics are a partial, not total, picture.</li>
+          <li><strong>GMB Strength, Reviews, Rating, Direction Clicks, and Calls Clicked are live from Google Business Profile</strong>, connected via an account that manages the real store listings directly. Malleshwaram's listing is still "Processing" in Google's system as of this writing, so these 5 show unavailable for that store only — no code change needed once Google finishes verifying it.</li>
+          <li><strong>Last Week/Last Month show a daily average, not the period total</strong>, for every metric that's a real sum-over-time — City/Paid/Retargeting/Communication Sessions, Deals, Meetings Raised, Walkins, Orders, Revenue, Spend, Store Calls Dialed/Connected/Connected &gt; 30s, Store Talktime, Direction Clicks, and Calls Clicked — divided by the real number of calendar days in each period (7 for a week; 28&ndash;31 for a month). Yesterday is unaffected (it's already a single day). Inventory, GMB Strength, Lifetime Google Reviews, and Google Rating stay as a live snapshot (not a sum, so an average doesn't apply). The 3 Cost-Per-X ratios always divide Spend by Sessions/Deals/Meetings Raised using their real period totals internally, never the averages actually shown on screen.</li>
+          <li><strong>Number of Staff is manually entered</strong>, not pulled from any data source — there's no HR/staffing table anywhere in the project. It's a plain editable field on the dashboard, saved to a small BigQuery table, blank until someone types a count in. "All Stores" sums whichever stores have a value entered so far.</li>
+          <li><strong>Partial failures degrade gracefully</strong> — if one source fails, only the metrics it feeds show "Data unavailable"; the rest of the dashboard still loads.</li>
+          <li><strong>Full outage</strong> shows "Unable to load dashboard data."; technical errors are logged server-side only, never sent to the browser.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <script src="store-performance.js"></script>
+</body>
+</html>

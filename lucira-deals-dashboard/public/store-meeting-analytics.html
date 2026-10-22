@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Store Meeting &amp; Conversion Analytics</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="refill-management-style.css" />
+<link rel="stylesheet" href="store-meeting-analytics.css" />
+<script src="theme.js"></script>
+</head>
+<body class="sm-page">
+  <div class="viz-root">
+    <header class="app-header">
+      <div>
+        <h1>Lucirá Jewelry</h1>
+        <p class="subtitle">Store Meeting &amp; Conversion Analytics &middot; Deal &rarr; Meeting &rarr; Show &rarr; Conversion</p>
+      </div>
+      <div class="header-actions">
+        <span id="updatedAt" class="updated-at"></span>
+        <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+        <button id="refreshBtn" class="refresh-btn" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <form class="sm-filters" id="filters" autocomplete="off">
+      <fieldset class="sm-fgroup">
+        <legend>Date</legend>
+        <div class="window-toggle" id="datePresets" role="group" aria-label="Date range">
+          <button type="button" class="option-btn" data-preset="today">Today</button>
+          <button type="button" class="option-btn" data-preset="yesterday">Yesterday</button>
+          <button type="button" class="option-btn" data-preset="lastWeek">Last Week</button>
+          <button type="button" class="option-btn" data-preset="lastMonth">Last Month</button>
+          <button type="button" class="option-btn" data-preset="custom">Custom</button>
+        </div>
+        <span id="customDates" class="sm-custom" hidden>
+          <input type="date" name="dateFrom" aria-label="Date from" />
+          <input type="date" name="dateTo" aria-label="Date to" />
+        </span>
+      </fieldset>
+      <label class="sm-f">City<select name="market"></select></label>
+      <label class="sm-f">Store<select name="store"></select></label>
+      <label class="sm-f">Agent<select name="agent"></select></label>
+      <label class="sm-f">Meeting status<select name="meetingStatus"></select></label>
+      <label class="sm-f">Visit outcome<select name="visit"></select></label>
+      <label class="sm-f">Conversion<select name="conversion"></select></label>
+      <div class="sm-factions">
+        <button type="submit" class="apply-filters-btn">Apply</button>
+        <button type="button" id="resetFilters" class="theme-toggle">Reset</button>
+      </div>
+    </form>
+
+    <div id="chips" class="sm-chips" hidden></div>
+    <div id="statusBar" class="status-bar" hidden></div>
+    <div id="notice" class="data-quality-banner" hidden></div>
+
+    <div class="page-tabs">
+      <button type="button" class="page-tab-btn is-active" data-panel="overviewPanel">Overview</button>
+      <button type="button" class="page-tab-btn" data-panel="performancePanel">Store &amp; Agent</button>
+      <button type="button" class="page-tab-btn" data-panel="logicPanel">Logic</button>
+    </div>
+
+    <div id="loading" class="sm-loading" hidden>
+      <div class="sm-spinner"></div>
+      <p id="loadingText">Loading…</p>
+    </div>
+
+    <div id="content" hidden>
+      <section class="page-panel is-active" id="overviewPanel">
+        <div id="kpiGrid" class="kpi-grid sm-kpis"></div>
+        <div class="charts-grid" id="chartsGrid"></div>
+        <div id="productSection"></div>
+        <h2 class="table-heading sm-gap" id="weekHeading">Scheduled Meetings</h2>
+        <p class="th-sub sm-hint">Meetings by their From (scheduled) date, India time, shown store-wise and agent-wise, then in full below. This date filter is only for this section.</p>
+        <div class="sm-tblfilter">
+          <div class="window-toggle" id="weekPresets" role="group" aria-label="Scheduled date range">
+            <button type="button" class="option-btn" data-wp="thisWeek">This Week</button>
+            <button type="button" class="option-btn" data-wp="today">Today</button>
+            <button type="button" class="option-btn is-active" data-wp="yesterday">Yesterday</button>
+            <button type="button" class="option-btn" data-wp="lastWeek">Last Week</button>
+            <button type="button" class="option-btn" data-wp="lastMonth">Last Month</button>
+            <button type="button" class="option-btn" data-wp="custom">Custom</button>
+          </div>
+          <span id="weekCustom" class="sm-custom" hidden>
+            <input type="date" id="weekFrom" aria-label="Scheduled from">
+            <input type="date" id="weekTo" aria-label="Scheduled to">
+            <button type="button" id="weekApply" class="apply-filters-btn">Apply</button>
+          </span>
+        </div>
+        <h3 class="table-heading sm-gap" id="weekStoreHeading">Store-wise Schedule</h3>
+        <div id="weekStoreTable"></div>
+        <h3 class="table-heading sm-gap" id="weekAgentHeading">Agent-wise Schedule</h3>
+        <p class="th-sub sm-hint">Agent = who raised the meeting (Created By).</p>
+        <div id="weekAgentTable"></div>
+        <h2 class="table-heading sm-gap" id="weekDumpHeading">Scheduled Meetings — Details</h2>
+        <p class="th-sub sm-hint">Every meeting scheduled in the period selected above, with its full details. Same meetings as the store-wise and agent-wise numbers above.</p>
+        <div id="weekDump"></div>
+      </section>
+
+      <section class="page-panel" id="performancePanel">
+        <h2 class="table-heading">Store Performance</h2>
+        <p class="th-sub sm-hint">Deals are given a store from the customer city (Delhi by zone). Mumbai deals are split 50/50 between Borivali and Chembur; deals with no usable city stay unassigned, so store rows add up to less than the total.</p>
+        <div id="storeTable"></div>
+        <h2 class="table-heading sm-gap">Agent Performance</h2>
+        <p class="th-sub sm-hint">Agent = who raised the meeting (Created By). Click a row to see that agent's stores.</p>
+        <div id="agentTable"></div>
+        <h2 class="table-heading sm-gap" id="meetingHeading">Meetings Raised — Details</h2>
+        <p class="th-sub sm-hint">Every meeting created in the selected date range (and matching the other filters). Same meetings that make up the Meetings Raised number.</p>
+        <div id="meetingTable"></div>
+      </section>
+
+      <section class="page-panel" id="logicPanel">
+        <div id="logicBody"></div>
+      </section>
+    </div>
+  </div>
+  <div id="kpiModal" class="sm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="kpiModalTitle">
+    <div class="sm-modal-box">
+      <div class="sm-modal-head">
+        <div><h2 id="kpiModalTitle"></h2><p id="kpiModalSub" class="th-sub"></p></div>
+        <button type="button" id="kpiModalClose" class="theme-toggle" aria-label="Close list">&times;</button>
+      </div>
+      <div id="kpiModalBody" class="sm-modal-body"></div>
+    </div>
+  </div>
+  <script src="store-meeting-analytics.js"></script>
+</body>
+</html>

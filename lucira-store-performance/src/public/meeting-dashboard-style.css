@@ -1,0 +1,431 @@
+/* =============================================================================
+   Meeting Dashboard — theme
+   A premium black / white / gold re-skin of this app's shared style.css.
+   Loaded AFTER style.css on this page only, so every shared component
+   (kpi-card, report-table, multiselect, badge, filters-bar, logic-box…)
+   keeps working unchanged — this file only redefines the design tokens
+   those components already read via var(--…), plus a small set of new,
+   reusable classes (.md-card, .kpi-card--highlight, hover states) layered
+   on top. Nothing here is meeting-dashboard-specific logic — it's a
+   drop-in visual theme any page on this app could load the same way.
+   ========================================================================== */
+
+/* -----------------------------------------------------------------------
+   1. Design tokens — redefines style.css's palette for this document only
+   ----------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  /* Neutrals — warm off-white canvas, near-black ink (not pure #000/#fff,
+     so large flat areas don't glare). */
+  --page-plane: #f7f6f3;
+  --surface-1: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #5c5850;
+  --text-muted: #918c80;
+  --gridline: #ececE7;
+  --baseline: #ddd6c2;
+  --border: rgba(26, 26, 26, 0.10);
+
+  /* Gold — one hue, two weights: a brighter gold for borders/icons/fills
+     (--accent) and a deeper, text-safe gold for numerals/links on white
+     (--md-gold-ink), so "gold text" never drifts into low-contrast. */
+  --accent: #b8952e;
+  --md-gold-ink: #8a6d1f;
+  --md-gold-soft: rgba(184, 149, 46, 0.12);
+  --md-gold-soft-strong: rgba(184, 149, 46, 0.22);
+
+  --critical: #a3352c;
+  --good: #386641;
+
+  /* Reusable card/spacing scale — kept as tokens so any future section
+     stays visually consistent by construction rather than by copy-paste. */
+  --md-radius-lg: 14px;
+  --md-radius-md: 10px;
+  --md-radius-sm: 7px;
+  --md-shadow-sm: 0 1px 2px rgba(20, 16, 8, 0.05);
+  --md-shadow-md: 0 4px 16px rgba(20, 16, 8, 0.07);
+  --md-shadow-lift: 0 10px 24px rgba(20, 16, 8, 0.12);
+  --md-space-sm: 8px;
+  --md-space-md: 16px;
+  --md-space-lg: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page-plane: #121110;
+    --surface-1: #1c1a17;
+    --text-primary: #f3efe6;
+    --text-secondary: #cbc3b3;
+    --text-muted: #8f8878;
+    --gridline: #2c2a25;
+    --baseline: #453e2c;
+    --border: rgba(243, 239, 230, 0.10);
+    --accent: #d9b23c;
+    --md-gold-ink: #e6c256;
+    --md-gold-soft: rgba(217, 178, 60, 0.14);
+    --md-gold-soft-strong: rgba(217, 178, 60, 0.26);
+    --critical: #e08a82;
+    --good: #8fb36c;
+    --md-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --md-shadow-md: 0 4px 18px rgba(0, 0, 0, 0.45);
+    --md-shadow-lift: 0 12px 28px rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page-plane: #121110;
+  --surface-1: #1c1a17;
+  --text-primary: #f3efe6;
+  --text-secondary: #cbc3b3;
+  --text-muted: #8f8878;
+  --gridline: #2c2a25;
+  --baseline: #453e2c;
+  --border: rgba(243, 239, 230, 0.10);
+  --accent: #d9b23c;
+  --md-gold-ink: #e6c256;
+  --md-gold-soft: rgba(217, 178, 60, 0.14);
+  --md-gold-soft-strong: rgba(217, 178, 60, 0.26);
+  --critical: #e08a82;
+  --good: #8fb36c;
+  --md-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --md-shadow-md: 0 4px 18px rgba(0, 0, 0, 0.45);
+  --md-shadow-lift: 0 12px 28px rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --page-plane: #f7f6f3;
+  --surface-1: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #5c5850;
+  --text-muted: #918c80;
+  --gridline: #ececE7;
+  --baseline: #ddd6c2;
+  --border: rgba(26, 26, 26, 0.10);
+  --accent: #b8952e;
+  --md-gold-ink: #8a6d1f;
+  --md-gold-soft: rgba(184, 149, 46, 0.12);
+  --md-gold-soft-strong: rgba(184, 149, 46, 0.22);
+  --critical: #a3352c;
+  --good: #386641;
+  --md-shadow-sm: 0 1px 2px rgba(20, 16, 8, 0.05);
+  --md-shadow-md: 0 4px 16px rgba(20, 16, 8, 0.07);
+  --md-shadow-lift: 0 10px 24px rgba(20, 16, 8, 0.12);
+}
+
+/* -----------------------------------------------------------------------
+   2. Base & layout
+   ----------------------------------------------------------------------- */
+.md-page {
+  letter-spacing: 0.005em;
+}
+
+.md-page .viz-root {
+  max-width: 1360px;
+}
+
+.md-page .app-header h1 {
+  letter-spacing: 0.01em;
+}
+
+.md-page .subtitle {
+  font-size: 12.5px;
+}
+
+/* A slim gold rule under the header ties the whole page to the accent
+   color without adding another block of visual weight. */
+.md-page .app-header {
+  padding-bottom: var(--md-space-md);
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: var(--md-space-lg);
+}
+
+/* -----------------------------------------------------------------------
+   3. Buttons & header actions
+   ----------------------------------------------------------------------- */
+.md-page .theme-toggle,
+.md-page .refresh-btn {
+  border-radius: var(--md-radius-sm);
+  font-weight: 600;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+}
+
+.md-page .refresh-btn {
+  background: var(--text-primary);
+  color: var(--surface-1);
+  border-color: var(--text-primary);
+}
+
+.md-page .refresh-btn:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1a1a;
+  transform: translateY(-1px);
+}
+
+.md-page .theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--md-gold-ink);
+}
+
+.md-page .page-tab-btn {
+  transition: color 0.15s ease;
+}
+
+.md-page .page-tab-btn:hover {
+  color: var(--md-gold-ink);
+}
+
+/* -----------------------------------------------------------------------
+   4. Filters — modern pill-style dropdown controls
+   ----------------------------------------------------------------------- */
+.md-page .filters-bar {
+  border-radius: var(--md-radius-lg);
+  box-shadow: var(--md-shadow-sm);
+  padding: var(--md-space-md) var(--md-space-lg);
+}
+
+.md-page .filter-section-title {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.md-page .multiselect-toggle,
+.md-page .filters-bar-dates input[type="date"] {
+  border-radius: 999px;
+  border-color: var(--border);
+  font-weight: 500;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.md-page .multiselect-toggle:hover,
+.md-page .filters-bar-dates input[type="date"]:hover {
+  border-color: var(--accent);
+}
+
+.md-page .multiselect-toggle:focus-visible,
+.md-page .filters-bar-dates input[type="date"]:focus-visible,
+.md-page .table-search:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--md-gold-soft);
+}
+
+.md-page .multiselect-panel {
+  border-radius: var(--md-radius-md);
+  box-shadow: var(--md-shadow-lift);
+}
+
+.md-page .multiselect-option:hover {
+  background: var(--md-gold-soft);
+}
+
+.md-page .multiselect-option input,
+.md-page .toggle-label input {
+  accent-color: var(--accent);
+}
+
+.md-page .apply-filters-btn {
+  border-radius: 999px;
+  background: var(--text-primary);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.md-page .apply-filters-btn:hover {
+  background: var(--accent);
+  color: #1a1a1a;
+  transform: translateY(-1px);
+}
+
+.md-page .table-search {
+  border-radius: 999px;
+}
+
+.md-page .table-search:hover {
+  border-color: var(--accent);
+}
+
+/* -----------------------------------------------------------------------
+   5. KPI cards
+   ----------------------------------------------------------------------- */
+.md-page .kpi-grid {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--md-space-md);
+  margin-bottom: var(--md-space-lg);
+}
+
+.md-page .kpi-card {
+  border-radius: var(--md-radius-lg);
+  box-shadow: var(--md-shadow-sm);
+  padding: 18px 20px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.md-page .kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--md-shadow-md);
+  border-color: var(--accent);
+}
+
+.md-page .kpi-label {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.md-page .kpi-value {
+  font-size: 28px;
+  letter-spacing: -0.01em;
+}
+
+/* The headline metrics (Total Deals, City Deals, Store Visits, Today's
+   Fixed Meetings, Walk-ins, Orders) get the gold accent treatment — a
+   top rule plus gold numerals — so they read first in the grid. */
+.md-page .kpi-card--highlight {
+  border-color: var(--md-gold-soft-strong);
+  background:
+    linear-gradient(var(--surface-1), var(--surface-1)) padding-box,
+    linear-gradient(90deg, var(--accent), var(--md-gold-ink)) top / 100% 3px no-repeat border-box;
+  border-top: 3px solid transparent;
+}
+
+.md-page .kpi-card--highlight .kpi-value {
+  color: var(--md-gold-ink);
+}
+
+/* -----------------------------------------------------------------------
+   6. Section cards — every "Deals by City / Store-wise…" block becomes a
+      distinct white card instead of a bare heading + table floating on
+      the page background.
+   ----------------------------------------------------------------------- */
+.md-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--md-radius-lg);
+  box-shadow: var(--md-shadow-sm);
+  padding: var(--md-space-lg);
+  margin-bottom: var(--md-space-lg);
+  transition: box-shadow 0.15s ease;
+}
+
+.md-card:hover {
+  box-shadow: var(--md-shadow-md);
+}
+
+.md-card .table-heading {
+  margin-bottom: var(--md-space-md);
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.md-card .table-wrap {
+  box-shadow: none;
+  border-color: var(--gridline);
+}
+
+/* A short variant for long lookup tables (e.g. Deals by City) — same full
+   card width as every other table on the page (so cards line up, no dead
+   space beside a narrowed table), just capped shorter and scrollable
+   internally instead of pushing the rest of the page down. */
+.md-table-compact {
+  max-height: 260px;
+}
+
+/* Today's Meetings — the most time-sensitive section on the page gets a
+   gold-tinted card instead of the plain white ones, so it's found at a
+   glance without needing a louder color. */
+.md-card--highlight {
+  background: linear-gradient(180deg, var(--md-gold-soft) 0%, var(--surface-1) 140px);
+  border-color: var(--md-gold-soft-strong);
+}
+
+.md-card--highlight .table-heading {
+  color: var(--md-gold-ink);
+}
+
+/* -----------------------------------------------------------------------
+   7. Tables
+   ----------------------------------------------------------------------- */
+.md-page .report-table th {
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-size: 11px;
+  background: var(--surface-1);
+}
+
+.md-page .report-table tbody tr {
+  transition: background-color 0.1s ease;
+}
+
+.md-page .report-table tbody tr:hover {
+  background: var(--md-gold-soft);
+}
+
+.md-page .report-table tbody tr.row-total {
+  background: var(--page-plane);
+}
+
+.md-page .report-table tbody tr.row-total:hover {
+  background: var(--page-plane);
+}
+
+/* -----------------------------------------------------------------------
+   8. Badges — Called / Not Called, meeting status
+   ----------------------------------------------------------------------- */
+.md-page .badge {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 10px;
+}
+
+.md-page .badge-good {
+  background: rgba(56, 102, 65, 0.12);
+}
+
+.md-page .badge-critical {
+  background: rgba(163, 53, 44, 0.10);
+}
+
+.md-page .badge-accent {
+  background: var(--md-gold-soft);
+  color: var(--md-gold-ink);
+}
+
+/* -----------------------------------------------------------------------
+   9. Logic / data-notes box
+   ----------------------------------------------------------------------- */
+.md-page .logic-box {
+  border-radius: var(--md-radius-lg);
+  box-shadow: var(--md-shadow-sm);
+}
+
+.md-page .logic-box-title {
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+  font-size: 13px;
+}
+
+/* -----------------------------------------------------------------------
+   10. Responsive — tuned for desktop/laptop widths, not phone-first
+   ----------------------------------------------------------------------- */
+@media (max-width: 1200px) {
+  .md-page .kpi-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .md-card {
+    padding: var(--md-space-md);
+  }
+
+  .md-page .kpi-value {
+    font-size: 24px;
+  }
+}

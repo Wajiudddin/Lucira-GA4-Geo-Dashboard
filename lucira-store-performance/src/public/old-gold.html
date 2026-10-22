@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Old Gold (URD) Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <header class="app-header">
+      <div>
+        <h1>OLD GOLD (URD) DASHBOARD</h1>
+        <p class="subtitle">BigQuery &middot; Lucira_Prod.exchange + exchange_items &middot; URD (cash old-gold purchase) only &mdash; Exchange &amp; Buy Back excluded</p>
+      </div>
+      <div class="header-actions">
+        <span id="updatedAt" class="updated-at"></span>
+        <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+        <button id="refreshBtn" class="refresh-btn">Refresh</button>
+      </div>
+    </header>
+
+    <div class="filters-bar">
+      <div class="filter-section-title">Store</div>
+      <div class="multiselect" id="storeMultiselect">
+        <button type="button" class="multiselect-toggle" id="storeToggle">All stores</button>
+        <div class="multiselect-panel" id="storePanel" hidden></div>
+      </div>
+
+      <div class="filter-section-title">Month</div>
+      <div class="multiselect" id="monthMultiselect">
+        <button type="button" class="multiselect-toggle" id="monthToggle">All months</button>
+        <div class="multiselect-panel" id="monthPanel" hidden></div>
+      </div>
+
+      <div class="filters-bar-dates">
+        <label for="dateFrom">From</label>
+        <input type="date" id="dateFrom" />
+        <label for="dateTo">To</label>
+        <input type="date" id="dateTo" />
+      </div>
+
+      <button type="button" id="applyFilters" class="apply-filters-btn">Apply</button>
+
+      <span class="filter-meta" id="filterMeta"></span>
+    </div>
+
+    <div id="statusBar" class="status-bar" hidden></div>
+
+    <div class="page-tabs">
+      <button class="page-tab-btn is-active" data-panel="dashboardPanel">Old Gold Dashboard</button>
+      <button class="page-tab-btn" data-panel="exchangeBuybackPanel">Exchange &amp; Buy Back</button>
+      <button class="page-tab-btn" data-panel="logicPanel">Old Gold Logic</button>
+    </div>
+
+    <!-- ============================ Old Gold Dashboard ============================ -->
+    <section class="page-panel is-active" id="dashboardPanel">
+      <div id="kpiGrid"></div>
+
+      <div class="charts-grid" id="chartsGrid"></div>
+
+      <h2 class="table-heading">Store-wise Summary</h2>
+      <div id="storeSummaryContainer"></div>
+
+      <h2 class="table-heading">Old Gold (URD) Transactions</h2>
+      <input type="text" id="tableSearch" class="table-search" placeholder="Search anything in the table..." />
+      <div id="oldGoldTablesContainer"></div>
+    </section>
+
+    <!-- ============================ Exchange & Buy Back ============================ -->
+    <section class="page-panel" id="exchangeBuybackPanel">
+      <p class="subtitle" style="margin: -4px 0 16px;">Finished jewelry pieces traded in as part of a new-jewelry sale (Exchange) or bought back from a customer (Buy Back) &mdash; not old gold, so no Metal Type or Transfer to HO here.</p>
+      <div id="exchangeBuybackKpiGrid"></div>
+
+      <h2 class="table-heading">Store-wise Summary</h2>
+      <div id="exchangeBuybackStoreContainer"></div>
+
+      <h2 class="table-heading">Exchange &amp; Buy Back Transactions</h2>
+      <input type="text" id="exchangeBuybackTableSearch" class="table-search" placeholder="Search anything in the table..." />
+      <div id="exchangeBuybackTableContainer"></div>
+    </section>
+
+    <!-- ============================ Old Gold Logic ============================ -->
+    <section class="page-panel" id="logicPanel">
+      <div class="logic-box">
+        <h2 class="logic-box-title">OLD GOLD (URD) LOGIC</h2>
+        <div class="logic-box-columns">
+          <ol class="logic-list">
+            <li>Shows only <strong>cash purchases of old gold</strong> (URD). Gold traded in for new jewelry (Exchange), Buy Back, and cancelled orders are all left out &mdash; Exchange and Buy Back get their own tab instead, since those are finished jewelry pieces, not old gold.</li>
+            <li>Store = branch that bought it. Customer = person who sold it. Items Purchased is a real count of pieces, not a system field (which is often wrong).</li>
+            <li>Purity is shown as a percentage. Pure Weight = Net Weight &times; Purity.</li>
+            <li>Metal Type shows Gold or Silver, or the item's real name for the rare piece that's neither.</li>
+            <li>Numbers are shown separately for Gold and Silver everywhere on this page &mdash; the scorecards at the top, and Store-wise Summary, which breaks the same numbers down by store too.</li>
+            <li>Avg Rate / g = total money paid &divide; total pure weight (not a simple average, so bigger purchases count more).</li>
+            <li><strong>Receive Rate / Today Rate:</strong> the market gold (or silver) rate on the day it was bought, versus today's rate, from the live daily rate feed. <strong>Received Amount</strong> = Receive Rate &times; Net Weight &times; Purity; <strong>Today Amount</strong> = Today Rate &times; Net Weight &times; Purity &mdash; the same piece, valued then versus now. Updates automatically every time the dashboard refreshes, since "today" and the rate feed are both re-read on every refresh.</li>
+            <li><strong>Transfer to HO:</strong> a store's old gold is later sent onward as a separate event. Every physical lot carries a lot number that shows up on both the purchase and the later movement, so that's what links them (falling back to matching by store, weight, and purity for the rare item with no lot number). Shows <strong>Transferred</strong>, <strong>Pending</strong>, or <strong>N/A</strong> (bought directly at HO). Days to Transfer shows how long that took, or how long a Pending item has been waiting so far.</li>
+            <li>The table at the bottom lists every individual piece, sortable by clicking any column heading and searchable with the box above it.</li>
+            <li>Store, Month, and Date filters update everything together, including the table. Data refreshes every 15 minutes, or click Refresh for the latest right away.</li>
+          </ol>
+          <div class="logic-flow">
+            <div class="logic-flow-step">ALL OLD GOLD TRANSACTIONS</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">KEEP CASH PURCHASES (URD) ONLY</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">ADD STORE, CUSTOMER, ITEM, LOCATION NAMES</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">COUNT ITEMS PER TRANSACTION</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">MATCH EACH ITEM TO ITS STOCK MOVEMENT<br>(STORE + WEIGHT + PURITY, DATE ORDER)</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">ADD UP WEIGHT, PURE WEIGHT &amp; AMOUNT</div>
+            <div class="logic-flow-arrow">&darr;</div>
+            <div class="logic-flow-step">SPLIT BY STORE, MONTH &amp; METAL TYPE</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="logic-box">
+        <h2 class="logic-box-title">EXCHANGE &amp; BUY BACK LOGIC</h2>
+        <div class="logic-box-columns">
+          <ol class="logic-list">
+            <li>This is the other side of what the Old Gold tab leaves out &mdash; <strong>Exchange</strong> and <strong>Buy Back</strong> transactions, plus cancelled orders excluded the same way.</li>
+            <li>These are real, finished jewelry pieces (rings, earrings, pendants) traded in by a customer &mdash; not raw old gold, so they get their own tab and their own numbers.</li>
+            <li><strong>Exchange</strong> = a customer traded in a piece as part of buying new jewelry.</li>
+            <li><strong>Buy Back</strong> = the store bought a piece back from a customer directly, with no new purchase attached.</li>
+            <li>No Gold/Silver split here &mdash; checked the data and every one of these pieces is gold/diamond jewelry, so a metal split would just show Silver at zero everywhere.</li>
+            <li>Store-wise Summary breaks the same numbers down by store, for each type.</li>
+            <li>The table at the bottom lists every individual piece, sortable by clicking any column heading.</li>
+            <li>This tab isn't affected by the Store/Month/Date filters above &mdash; it always shows everything. Refresh pulls the latest data the same way as the Old Gold tab.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="old-gold.js"></script>
+</body>
+</html>

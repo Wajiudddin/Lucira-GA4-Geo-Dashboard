@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Verified Meeting Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <header class="app-header">
+      <div>
+        <h1>Verified Meeting Dashboard</h1>
+        <p class="subtitle">Meeting tracker (Google Sheet) &middot; verified against BigQuery store walk-ins by mobile number &middot; Zoho Meetings not used &middot; <a class="nav-link" href="index.html">Deals Dashboard &rarr;</a></p>
+      </div>
+      <div class="header-actions">
+        <span id="updatedAt" class="updated-at"></span>
+        <button id="themeToggle" class="theme-toggle" type="button">🌙 Dark</button>
+        <button id="refreshBtn" class="refresh-btn">Refresh</button>
+      </div>
+    </header>
+
+    <div id="statusBar" class="status-bar" hidden></div>
+
+    <h2 class="table-heading">Till date — agent wise</h2>
+    <div id="verifiedMeetingTableContainer"></div>
+  </div>
+
+  <script src="verified-meeting.js"></script>
+</body>
+</html>

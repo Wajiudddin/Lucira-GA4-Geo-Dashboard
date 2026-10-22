@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vendor Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="sales-analytics-style.css" />
+<link rel="stylesheet" href="vendor-performance-style.css" />
+<script src="theme.js"></script>
+</head>
+<body>
+<main class="simple">
+  <header class="top">
+    <div><h1>Vendor Dashboard</h1>
+      <p>What we bought from each vendor vs what has sold &middot; purchase.invoice_items &times; marketing_sale (joined on item_line_no)</p></div>
+    <div class="acts"><span id="updated" class="muted"></span><button id="themeToggle" class="btn sm" type="button"></button><button id="refreshBtn" class="btn" type="button">Refresh</button></div>
+  </header>
+
+  <div class="card wide">
+    <div class="frow" style="margin:0">
+      <div class="tf"><span>Vendor</span><details class="ms" data-ms="v"><summary><span class="ms-t"></span><b class="ms-n"></b></summary><div class="ms-panel"></div></details></div>
+      <div class="tf"><span>Category</span><details class="ms" data-ms="cat"><summary><span class="ms-t"></span><b class="ms-n"></b></summary><div class="ms-panel"></div></details></div>
+      <div class="tf"><span>Karat</span><details class="ms" data-ms="kt"><summary><span class="ms-t"></span><b class="ms-n"></b></summary><div class="ms-panel"></div></details></div>
+      <div class="tf"><span>Metal</span><details class="ms" data-ms="mt"><summary><span class="ms-t"></span><b class="ms-n"></b></summary><div class="ms-panel"></div></details></div>
+      <label class="tf"><span>Purchased from</span><input type="date" id="dFrom"></label>
+      <label class="tf"><span>Purchased to</span><input type="date" id="dTo"></label>
+      <button id="resetBtn" class="btn sm" type="button">Reset</button>
+      <button id="nfBtn" class="btn sm nf-btn" type="button" title="Bought, not sold, and not found in any store. Click for the SKU list and export.">Not found at store</button>
+      <span id="scope" class="muted"></span>
+    </div>
+  </div>
+
+  <div id="body"><div class="card"><p class="empty">Loading…</p></div></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="vendor-performance.js"></script>
+</body>
+</html>

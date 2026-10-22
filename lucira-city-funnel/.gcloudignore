@@ -1,0 +1,5 @@
+node_modules/
+.git/
+*.log
+gcp-service-account.json
+.env
