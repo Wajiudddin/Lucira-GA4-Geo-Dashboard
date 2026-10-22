@@ -1,0 +1,244 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>MTO Order Journey v1.2</title>
+<style>
+@page{size:952px 1233px;margin:0}
+*{box-sizing:border-box}
+body{margin:0;font-family:Georgia,'Times New Roman',serif;color:#4a4a4a;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{width:952px;height:1233px;padding:56px 75px;position:relative;overflow:hidden;page-break-after:always;background:#fff}
+.eyebrow{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#4a3022;margin:0 0 14px}
+h1{font-size:50px;line-height:1.05;margin:0 0 16px;color:#231c1a;font-weight:700}
+.sub{font-size:19px;line-height:1.5;color:#555;margin:0 0 22px;padding-bottom:20px;border-bottom:4px solid #eee}
+.lead{font-size:17px;line-height:1.5;color:#555;margin:0 0 20px}
+.badge{position:absolute;right:18px;bottom:18px;background:#0b1f4d;color:#fff;font:14px Arial,sans-serif;padding:14px 24px;border-radius:30px}
+.cover{background:#f3e3d9;padding:0}
+.cover .top{background:#f3e3d9;height:833px;padding:56px 46px}
+.cover h1{font-size:200px;line-height:.85;color:#3f2515;margin:50px 0 40px -22px;letter-spacing:-4px}
+.cover .bar{width:283px;height:7px;background:#3f2515;border-radius:4px;margin:0 0 40px}
+.cover .bottom{background:#f2f2f2;height:400px;padding:78px 46px;display:flex;gap:38px}
+.cover .bottom div{flex:1;border:1px solid #ddd;padding:24px;height:185px}
+.cover .bottom small{font-size:14px;color:#3f2515}.cover .bottom b{display:block;font-size:22px;margin:14px 0 10px;color:#4a4a4a}
+.cover .bottom span{font-size:17px;color:#aaa;line-height:1.4}
+.box{padding:22px;margin-bottom:14px}
+.box .k{font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+.box h3{font-size:28px;margin:0 0 8px}
+.box p{font-size:18px;line-height:1.45;margin:0 0 12px}
+.tag{display:inline-block;font-size:13px;letter-spacing:.04em;text-transform:uppercase;padding:6px 12px;background:#f3e3d9;color:#3f2515}
+.g{background:#f0f0f0;color:#444}.p{background:#f3e3d9;color:#111}.d{background:#3f2515;color:#fff}
+.d .tag{background:#6e4a36;color:#fff}.p .tag{background:#fdf0e9}
+.three{display:flex;gap:14px;margin-top:14px}.three div{flex:1;border:2px solid #ddd;padding:12px 14px;font-size:16px}
+.three b{display:block;font-size:20px}
+.step{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid #f3e3d9}
+.n{flex:none;width:34px;height:34px;border-radius:50%;background:#3f2515;color:#fff;font:700 14px Arial,sans-serif;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.step h4{margin:0 0 4px;font-size:23px;color:#3a3a3a}.step p{margin:0;font-size:17px;line-height:1.45;color:#666}
+.rule{background:#fbf0b8;padding:22px 20px;font-size:17px;color:#111;margin-top:18px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:36px 36px}
+.card{background:#f8f6f7;padding:22px;min-height:240px}.card .n{margin-bottom:10px}
+.card h4{font-size:25px;margin:0 0 10px;color:#3a3a3a}.card p{margin:0;font-size:17px;line-height:1.45;color:#666}
+.pass{display:flex;margin-top:30px}.pass .a{background:#f3e3d9;padding:24px;width:200px;font-size:20px}.pass .a small{display:block;font-size:13px;margin-bottom:8px}
+.pass .b{background:#3f2515;color:#fff;flex:1;padding:24px;font-size:20px;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:16px}
+th{text-align:left;font-size:15px;letter-spacing:.05em;text-transform:uppercase;color:#111;padding:12px 8px;border-bottom:2px solid #111}
+td{padding:9px 8px;border-bottom:1px solid #e6e6e6;line-height:1.3;vertical-align:top}td:first-child{font-weight:700}
+.hl{font-weight:700;color:#3f2515}
+.qg{display:grid;grid-template-columns:1fr 1fr;gap:38px 38px}.q{background:#f3e3d9;padding:18px 18px;border-top:0}
+.q small{display:block;font-weight:700;font-size:14px;color:#111;margin-bottom:10px;padding-bottom:10px;border-top:0}
+.q h4{margin:0 0 6px;font-size:25px;color:#111}.q p{margin:0;font-size:17px;color:#555}
+.q.dk{background:#3f2515}.q.dk h4,.q.dk small{color:#fff}.q.dk p{color:#eee}
+.st{display:flex;gap:16px;padding:20px 0;border-bottom:1px solid #f3e3d9;font-size:25px;font-weight:700;color:#3a3a3a;align-items:center}
+.ex{background:#3f2515;color:#fff;padding:22px;font-size:27px;line-height:1.35;margin-top:16px}.ex small{display:block;font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;font-weight:400}
+.two{display:flex;gap:36px;margin-top:20px}.two div{flex:1;border:2px solid #ddd;padding:18px}.two b{font-size:21px;display:block;margin-top:6px}
+.kpi{display:flex;gap:22px;margin-bottom:22px}.kpi div{flex:1;padding:22px;min-height:230px;background:#f0f0f0}.kpi .big{font-size:60px;font-weight:700;line-height:1}
+.new{background:#fff3c4}
+</style></head><body>
+
+<!-- 1 COVER -->
+<div class="page cover"><div class="top">
+<div class="eyebrow">OPERATIONS DEPARTMENT · INTERNAL SOP</div>
+<h1>MTO<br>ORDER<br>JOURNEY</h1><div class="bar"></div>
+<div style="font-size:31px;font-weight:700;color:#111;margin-bottom:14px">End-to-end process &amp; control model</div>
+<div style="font-size:22px;color:#111"><b>Version 1.2</b> · October 2026</div>
+<div style="font-size:17px;color:#111;margin-top:18px">Professional internal control document for Lucira jewelry.</div></div>
+<div class="bottom"><div><small>01</small><b>Order creation</b><span>Capture and validate the requirement.</span></div>
+<div><small>02</small><b>Production control</b><span>Allocate, place, produce and inspect.</span></div>
+<div><small>03</small><b>Final fulfilment</b><span>Deliver online or return to store.</span></div></div></div>
+
+<!-- 2 ORIENTATION -->
+<div class="page"><div class="eyebrow">OPERATING MODEL · ORIENTATION</div>
+<h1>Three journeys, one controlled operating model</h1>
+<div class="sub" style="font-weight:700;font-size:25px;color:#333">The source changes. The control backbone does not.</div>
+<p class="lead">An MTO order moves through creation, validation, vendor production, inward, quality check, tagging, invoicing and final customer fulfilment. Online, store and customer orders enter through different channels, then converge around production control and quality assurance.</p>
+<div class="box g"><div class="k">ONLINE MTO</div><h3>Customer → Shopify</h3>
+<p>Shopify → Ornaverse → <b>Product Verification (Product Team)</b> → Vendor → Production → <b>Inward → Quality Check</b> → Tagging → Invoice → Logistics → Customer</p><span class="tag">FINAL MOVEMENT: LOGISTICS</span></div>
+<div class="box p"><div class="k">STORE MTO</div><h3>Customer → Store</h3>
+<p>Store → Ornaverse → <b>Product Verification (Product Team)</b> → Vendor → Production → <b>Inward → Quality Check</b> → Tagging → Invoice → Store → Customer Pickup</p><span class="tag">FINAL MOVEMENT: STORE PICKUP</span></div>
+<div class="box d"><div class="k">CUSTOMER ORDER · CUSTOM DESIGN</div><h3>Customer order → Design</h3>
+<p><b>Design → CAD → Customer Approval → SKU Generation → Ornaverse</b> → Vendor → Production → <b>Inward → Quality Check</b> → Tagging → Invoice → Store → Customer Pickup</p><span class="tag">FINAL MOVEMENT: STORE PICKUP</span></div>
+<div class="three"><div><small>01</small><b>Validate</b>Before release.</div><div><small>02</small><b>Control</b>Through production and QC.</div><div><small>03</small><b>Route</b>To delivery or pickup.</div></div>
+<div class="badge">Made with <b>GAMMA</b></div></div>
+
+<!-- 3 CONTROL FLOW -->
+<div class="page"><div class="eyebrow">CORE PROCESS · END-TO-END CONTROL FLOW</div>
+<h1>The full MTO control flow</h1>
+<p class="lead">Every order advances through a defined sequence. A QC failure is a controlled loop, not a dead end.</p>
+<div style="border-top:4px solid #eee"></div>
+<div class="step"><div class="n">01</div><div><h4>Order received → created → validated</h4><p>Capture the order, punch it into the relevant system and hold incomplete or incorrect details for correction. Customer orders first complete Design → CAD → Customer approval → SKU generation.</p></div></div>
+<div class="step"><div class="n">02</div><div><h4>Ornaverse → product verification (Online / Store MTO)</h4><p>Product Team verifies the product details before the order is released to the vendor.</p></div></div>
+<div class="step"><div class="n">03</div><div><h4>Vendor allocation → order placement → production</h4><p>Assign the appropriate vendor, formally place the order and complete vendor production.</p></div></div>
+<div class="step"><div class="n">04</div><div><h4>Product received → inward</h4><p>Product received from the vendor is inwarded before inspection.</p></div></div>
+<div class="step"><div class="n">05</div><div><h4>Quality check (QC)</h4><p>Inspect the inwarded product before any tagging or invoice activity.</p></div></div>
+<div class="step"><div class="n">06</div><div><h4>QC PASS → tagging → invoice</h4><p>Only a passed product continues to operational completion.</p></div></div>
+<div class="step"><div class="n">07</div><div><h4>QC FAIL → Mumbai in-house vendor → rework / correction → product returns → re-QC</h4><p>The order returns to the control point and continues only after successful re-QC.</p></div></div>
+<div class="step"><div class="n">08</div><div><h4>Final fulfilment</h4><p>Route to customer delivery for Online MTO or to the originating store for customer pickup.</p></div></div>
+<div class="rule"><b>Decision rule:</b> QC failure must not move directly to tagging or invoicing.</div>
+<div class="badge">Made with <b>GAMMA</b></div></div>
+
+<!-- 4 ONLINE -->
+<div class="page"><div class="eyebrow">JOURNEY A · ONLINE CHANNEL</div>
+<h1>Online MTO — from Shopify to customer delivery</h1>
+<p class="sub" style="font-size:18px">Incomplete or incorrect details are held for correction before the order advances.</p>
+<div class="cards">
+<div class="card"><div class="n">01</div><h4>Order received</h4><p>Operations verifies order, customer and product details in Shopify.</p></div>
+<div class="card"><div class="n">02</div><h4>Validate</h4><p>Confirm customer, SKU, specifications, size, metal, karat, customisation and delivery information.</p></div>
+<div class="card"><div class="n">03</div><h4>Move to Ornaverse</h4><p>Release only when details are complete and correct.</p></div>
+<div class="card new"><div class="n">04</div><h4>Product verification</h4><p>Product Team verifies the product before it goes to the vendor.</p></div>
+<div class="card"><div class="n">05</div><h4>Allocate, place and produce</h4><p>Assign the vendor and place the order. Current standard production TAT: approximately <b>15 Days</b>.</p></div>
+<div class="card new"><div class="n">06</div><h4>Inward and quality check</h4><p>Product received from vendor and inwarded, then inspected by QC.</p></div></div>
+<div class="pass"><div class="a"><small>PASS</small>QC cleared</div><div class="b">Tagging → Invoice → Logistics → Customer delivery</div></div>
+<div class="badge">Made with <b>GAMMA</b></div></div>
+
+<!-- 5 STORE -->
+<div class="page"><div class="eyebrow">JOURNEY B · STORE CHANNEL</div>
+<h1>Store MTO — from customer requirement to pickup</h1>
+<div style="border-top:4px solid #eee;margin:14px 0 8px"></div>
+<div class="step"><div class="n">01</div><div><h4>Customer requirement at store</h4><p>Store captures the MTO need.</p></div></div>
+<div class="step"><div class="n">02</div><div><h4>Punch in Ornaverse</h4><p>Store creates the MTO order and validates product and customer details.</p></div></div>
+<div class="step new"><div class="n">03</div><div><h4>Product verification (Product Team)</h4><p>Product Team verifies the product details before the order is released to the vendor.</p></div></div>
+<div class="step"><div class="n">04</div><div><h4>Vendor processing and production</h4><p>Order is sent to the appropriate vendor. Current standard production TAT: approximately <b>15 Days</b>.</p></div></div>
+<div class="step new"><div class="n">05</div><div><h4>Inward</h4><p>Product received from vendor and inwarded.</p></div></div>
+<div class="step new"><div class="n">06</div><div><h4>Quality check</h4><p>QC inspects the inwarded product.</p></div></div>
+<div class="step"><div class="n">07</div><div><h4>Operational checks</h4><p>QC pass → tagging → invoice.</p></div></div>
+<div class="step"><div class="n">08</div><div><h4>Return to originating store</h4><p>Product is sent to the respective store, not directly to the customer.</p></div></div>
+<div class="step"><div class="n">09</div><div><h4>Customer pickup</h4><p>Customer visits the store and collects the completed MTO product.</p></div></div>
+<div class="rule"><b>Exception path:</b> QC fail → Mumbai in-house vendor → rework → product returns → re-QC. Continue only after QC pass.</div>
+<div class="badge">Made with <b>GAMMA</b></div></div>
+
+<!-- 6 CUSTOMER ORDER -->
+<div class="page"><div class="eyebrow">JOURNEY C · CUSTOMER ORDER (CUSTOM DESIGN)</div>
+<h1>Customer order — from custom design to pickup</h1>
+<p class="sub" style="font-size:18px;padding-bottom:10px;margin-bottom:0">A design-led order: the customer approves the design, and the SKU is generated, before the order enters Ornaverse.</p>
+<div class="step"><div class="n">01</div><div><h4>Customer order</h4><p>Customer places a custom MTO requirement with the store / sales team.</p></div></div>
+<div class="step new"><div class="n">02</div><div><h4>Design</h4><p>Design is prepared as per the customer requirement.</p></div></div>
+<div class="step new"><div class="n">03</div><div><h4>CAD</h4><p>CAD is created from the design.</p></div></div>
+<div class="step new"><div class="n">04</div><div><h4>Customer approval</h4><p>Design and CAD are shared with the customer and approved before release. No approval, no order.</p></div></div>
+<div class="step new"><div class="n">05</div><div><h4>SKU generation</h4><p>SKU is generated for the approved design.</p></div></div>
+<div class="step"><div class="n">06</div><div><h4>Ornaverse → vendor → production</h4><p>Approved order is created and validated in Ornaverse, then sent to the appropriate vendor. Standard production TAT: approximately <b>15 Days</b>.</p></div></div>
+<div class="step new"><div class="n">07</div><div><h4>Inward → quality check → tagging → invoice</h4><p>Product received from vendor and inwarded, inspected by QC, then tagged and invoiced after QC pass.</p></div></div>
+<div class="step"><div class="n">08</div><div><h4>Return to originating store</h4><p>Product is sent to the respective store, not directly to the customer.</p></div></div>
+<div class="step"><div class="n">09</div><div><h4>Customer pickup</h4><p>Customer visits the store and collects the completed product.</p></div></div>
+<div class="rule" style="margin-top:12px"><b>Exception path:</b> QC fail → Mumbai in-house vendor → rework → product returns → re-QC. Continue only after QC pass.</div>
+<div class="badge">Made with <b>GAMMA</b></div></div>
+
+<!-- 7 COMPARISON -->
+<div class="page"><div class="eyebrow">CONTROL BACKBONE · COMPARISON</div>
+<h1 style="font-size:44px">Online, store and customer-order MTO share the control backbone</h1>
+<p class="sub" style="font-size:18px;padding-bottom:12px">The main difference is the order source, pre-Ornaverse steps and the final movement after invoicing.</p>
+<div style="display:flex;gap:18px;margin-bottom:16px">
+<div class="p" style="flex:1.2;padding:18px;font-size:19px;font-weight:700;color:#111"><div class="k" style="font-size:13px;font-weight:400;text-transform:uppercase;margin-bottom:6px">COMMON BACKBONE</div>Ornaverse → vendor → production → inward → QC → rework loop → tagging → invoice</div>
+<div class="g" style="flex:1;padding:18px;font-size:19px;font-weight:700"><div style="font-size:13px;font-weight:400;text-transform:uppercase;margin-bottom:6px">ONLINE</div>Invoice → Logistics → Customer</div>
+<div class="d" style="flex:1;padding:18px;font-size:19px;font-weight:700"><div style="font-size:13px;font-weight:400;text-transform:uppercase;margin-bottom:6px">STORE / CUSTOMER ORDER</div>Invoice → Respective Store → Customer Pickup</div></div>
+<table><tr><th>Stage</th><th>Online MTO</th><th>Store MTO</th><th>Customer order</th></tr>
+<tr><td>Order source</td><td>Online</td><td>Store</td><td>Customer (custom design)</td></tr>
+<tr><td>Initial system</td><td>Shopify</td><td>Ornaverse</td><td>Design, then Ornaverse</td></tr>
+<tr><td>Design / CAD</td><td>Not required</td><td>Not required</td><td class="hl">Design → CAD</td></tr>
+<tr><td>Customer approval</td><td>Not required</td><td>Not required</td><td class="hl">Before SKU generation</td></tr>
+<tr><td>SKU generation</td><td>Not required</td><td>Not required</td><td class="hl">Before Ornaverse</td></tr>
+<tr><td>Order fulfilment</td><td>Ornaverse</td><td>Ornaverse</td><td>Ornaverse</td></tr>
+<tr><td>Product verification</td><td class="hl">Product Team</td><td class="hl">Product Team</td><td>Not required</td></tr>
+<tr><td>Production TAT</td><td>~15 Days</td><td>~15 Days</td><td>~15 Days</td></tr>
+<tr><td>Inward → QC</td><td class="hl">Inward, then QC</td><td class="hl">Inward, then QC</td><td class="hl">Inward, then QC</td></tr>
+<tr><td>QC failure</td><td>Mumbai In-house Vendor</td><td>Mumbai In-house Vendor</td><td>Mumbai In-house Vendor</td></tr>
+<tr><td>Re-QC</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>Tagging / invoice</td><td>Operations</td><td>Operations</td><td>Operations</td></tr>
+<tr><td>Final movement</td><td>Logistics</td><td>Respective store</td><td>Respective store</td></tr>
+<tr><td>Customer fulfilment</td><td>Home / online delivery</td><td>Store pickup</td><td>Store pickup</td></tr></table>
+<div class="badge">Made with <b>GAMMA</b></div></div>
+
+<!-- 8 QC -->
+<div class="page"><div class="eyebrow">QUALITY CONTROL · EXCEPTION LOOP</div>
+<h1>QC failure must resolve through rework and re-QC</h1>
+<p class="sub" style="font-size:18px">Quality control is a gate: a failed product returns to correction and cannot proceed to tagging or invoicing until it passes again.</p>
+<div class="qg">
+<div class="q"><small>01</small><h4>Product received &amp; inward</h4><p>Vendor product is received and inwarded.</p></div>
+<div class="q"><small>02</small><h4>Quality check</h4><p>QC reviews the inwarded product.</p></div>
+<div class="q"><small>03</small><h4>QC PASS</h4><p>Continue to tagging.</p></div>
+<div class="q dk"><small>04</small><h4>QC FAIL</h4><p>Send to Mumbai in-house vendor.</p></div>
+<div class="q"><small>05</small><h4>Rework / correction</h4><p>Complete the required correction.</p></div>
+<div class="q"><small>06</small><h4>Product returns</h4><p>Receive the corrected product again.</p></div></div>
+<div style="display:flex;margin-top:38px"><div class="q" style="flex:1"><small style="font-weight:400">RE-QC</small><h4>Inspect again</h4><p>Only after PASS does the normal flow resume.</p></div>
+<div style="flex:1;border:2px solid #ddd;padding:18px"><small style="font-size:13px">NORMAL FLOW</small><div style="font-size:24px;font-weight:700;margin:6px 0">Tagging → Invoice</div><span style="color:#666">Do not bypass the quality gate.</span></div></div>
+<div class="rule"><b>Control rule:</b> QC FAIL → rework / correction → product returns → re-QC → QC PASS.</div>
+<div class="badge">Made with <b>GAMMA</b></div></div>
+
+<!-- 9 MATRIX -->
+<div class="page"><div class="eyebrow">GOVERNANCE · OWNERSHIP REVIEW</div>
+<h1 style="font-size:46px">Responsibility matrix — confirm ownership where needed</h1>
+<p class="lead" style="margin-bottom:10px">Use this as an operating baseline. Any responsibility not explicitly defined in the source is marked <b>To Be Confirmed</b>.</p>
+<table style="font-size:15px"><tr><th>Process</th><th>Primary responsibility</th><th>Support / handoff</th><th>Status</th></tr>
+<tr><td>Order creation</td><td>Customer / Sales; Store Team for Store MTO</td><td>Operations</td><td>To Be Confirmed</td></tr>
+<tr><td>Validation</td><td>Operations; Store Team for Store MTO</td><td>Customer / Sales</td><td>To Be Confirmed</td></tr>
+<tr><td>CAD (Customer order)</td><td>CAD Team</td><td>Design Team</td><td>To Be Confirmed</td></tr>
+<tr><td>SKU generation (Customer order)</td><td>To Be Confirmed</td><td>Product Team</td><td>To Be Confirmed</td></tr>
+<tr><td>Product verification (Online / Store MTO)</td><td>Product Team</td><td>Operations</td><td>To Be Confirmed</td></tr>
+<tr><td>Vendor allocation</td><td>Operations</td><td>Vendor Team</td><td>To Be Confirmed</td></tr>
+<tr><td>Order placement</td><td>Operations / Vendor Team</td><td>External Vendor</td><td>To Be Confirmed</td></tr>
+<tr><td>Production</td><td>External Vendor</td><td>Vendor Team</td><td>To Be Confirmed</td></tr>
+<tr><td>Inward</td><td>Operations</td><td>QC Team</td><td>To Be Confirmed</td></tr>
+<tr><td>QC</td><td>QC Team</td><td>Operations</td><td>To Be Confirmed</td></tr>
+<tr><td>Rework</td><td>Mumbai In-house Vendor</td><td>QC Team; Vendor Team</td><td>To Be Confirmed</td></tr>
+<tr><td>Tagging</td><td>Operations</td><td>QC Team</td><td>To Be Confirmed</td></tr>
+<tr><td>Invoice</td><td>Operations</td><td>Store Team for Store MTO</td><td>To Be Confirmed</td></tr>
+<tr><td>Dispatch / movement</td><td>Logistics for Online; Store Team for Store MTO</td><td>Operations</td><td>To Be Confirmed</td></tr>
+<tr><td>Customer fulfilment</td><td>Logistics for Online; Store Team for Store MTO</td><td>Customer / Sales</td><td>To Be Confirmed</td></tr></table>
+<p style="font-size:15px;color:#888;margin-top:12px"><b>Management action:</b> confirm the primary owner and handoff at each open point before operational rollout.</p>
+<div class="badge">Made with <b>GAMMA</b></div></div>
+
+<!-- 10 STATUS -->
+<div class="page"><div class="eyebrow">OPERATIONAL TRACKING · PROPOSED TAXONOMY</div>
+<h1>Proposed status lifecycle for operational tracking</h1>
+<p class="sub" style="font-size:18px;padding-bottom:12px">These are proposed tracking statuses, not confirmed existing system statuses.</p>
+<div class="st"><div class="n">01</div>MTO Order Received → Order Validation</div>
+<div class="st"><div class="n">02</div>Customer order only: Design → CAD → Customer Approved → SKU Generated</div>
+<div class="st"><div class="n">03</div>Ready for Fulfilment → Product Verification (Online / Store) → Vendor Assigned → Order Placed</div>
+<div class="st"><div class="n">04</div>In Production → Awaiting Vendor → Received from Vendor</div>
+<div class="st"><div class="n">05</div>Inward Completed → QC Pending → QC Passed</div>
+<div class="st"><div class="n">06</div>Tagging Completed → Invoice Generated</div>
+<div class="st"><div class="n">07</div>Ready for Dispatch → Dispatched</div>
+<div class="ex"><small>EXCEPTION BRANCH</small>QC Failed → Sent for Rework → Rework Completed → Re-QC Pending → QC Passed</div>
+<div class="two"><div><small style="font-size:13px">NORMAL FLOW</small><b>Received → Inward → QC Pending → QC Passed → Tagging → Invoice → Dispatch</b></div>
+<div><small style="font-size:13px">TRACKING PRINCIPLE</small><br><span style="font-size:19px;line-height:1.4;display:block;margin-top:6px">Use a status that identifies the current control point, not only the last completed action.</span></div></div>
+<div class="badge">Made with <b>GAMMA</b></div></div>
+
+<!-- 11 TAT -->
+<div class="page"><div class="eyebrow">MANAGEMENT VIEW · TIMING AND CONTROLS</div>
+<h1 style="font-size:46px">TAT and control points — only production is currently known</h1>
+<p class="lead" style="margin-bottom:12px">Known TAT: vendor production is approximately <b>15 Days</b>. All other timings remain <b>To Be Defined</b>.</p>
+<div class="kpi" style="margin-bottom:14px"><div style="min-height:150px"><small>KNOWN</small><div class="big" style="font-size:48px">~15 Days</div>Vendor production</div>
+<div style="min-height:150px"><small>OPEN TIMING</small><div class="big" style="font-size:48px">TBD</div>All other stages</div>
+<div style="min-height:150px;background:#3f2515;color:#fff"><small>CONTROL OBJECTIVE</small><br><b style="font-size:19px">Define each handoff.</b><br>Make the next measurable point visible.</div></div>
+<table style="font-size:15px"><tr><th>Process</th><th>Current TAT</th><th>Control point</th></tr>
+<tr><td style="font-weight:400">Order validation</td><td>TBD</td><td>Complete order details</td></tr>
+<tr><td style="font-weight:400">Design / CAD / customer approval / SKU (Customer order)</td><td>TBD</td><td>SKU generated</td></tr>
+<tr><td style="font-weight:400">Product verification (Online / Store MTO)</td><td>TBD</td><td>Product verified</td></tr>
+<tr><td style="font-weight:400">Vendor allocation</td><td>TBD</td><td>Vendor assigned</td></tr>
+<tr><td style="font-weight:400">Vendor order placement</td><td>TBD</td><td>PO / order confirmation</td></tr>
+<tr><td>Production</td><td class="hl">~15 Days</td><td>Vendor production</td></tr>
+<tr><td style="font-weight:400">Vendor to inward</td><td>TBD</td><td>Product received / inward</td></tr>
+<tr><td style="font-weight:400">QC</td><td>TBD</td><td>QC pass / fail</td></tr>
+<tr><td style="font-weight:400">Rework</td><td>TBD</td><td>Correction completed</td></tr>
+<tr><td style="font-weight:400">Tagging</td><td>TBD</td><td>Tag completed</td></tr>
+<tr><td style="font-weight:400">Invoice</td><td>TBD</td><td>Invoice generated</td></tr>
+<tr><td style="font-weight:400">Logistics / store transfer</td><td>TBD</td><td>Final movement</td></tr>
+<tr><td style="font-weight:400">Customer fulfilment</td><td>TBD</td><td>Delivery / pickup</td></tr></table>
+<div class="rule" style="background:#f3e3d9;margin-top:14px;padding:16px 20px;font-size:16px"><b>Next control decision:</b> confirm owners and define TATs for each stage before the lifecycle is treated as an approved operating standard.</div>
+<div class="badge">Made with <b>GAMMA</b></div></div>
+</body></html>
