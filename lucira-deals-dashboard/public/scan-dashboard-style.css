@@ -1127,3 +1127,80 @@ table.grid tbody tr:hover td.sticky-col { background: #FBFAF7; }
   .search-input { min-width: 0; width: 100%; }
   .table-toolbar { flex-direction: column; align-items: stretch; }
 }
+
+/* ==========================================================================
+   KPI drill-down popup
+   ========================================================================== */
+
+.kpi-card.is-clickable { cursor: pointer; }
+.kpi-card.is-clickable:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.kpi-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(28, 22, 12, 0.55);
+}
+.kpi-modal-overlay[hidden] { display: none; }
+body.modal-open { overflow: hidden; }
+
+.kpi-modal {
+  width: min(1200px, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card-hover);
+  overflow: hidden;
+}
+
+.kpi-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.kpi-modal-head h2 {
+  font-family: 'Playfair Display', 'Inter', serif;
+  font-size: 20px;
+  margin: 0;
+}
+.kpi-modal-count { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+.kpi-modal-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.kpi-modal-actions input[type="search"] {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 9px 14px;
+  min-width: 240px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+.kpi-modal-actions input[type="search"]:focus { outline: none; border-color: var(--gold); }
+
+.kpi-modal-close {
+  border: none;
+  background: transparent;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 6px;
+}
+.kpi-modal-close:hover { color: var(--text-primary); }
+
+.kpi-modal-body { overflow: auto; flex: 1; min-height: 0; }
+.kpi-modal-body table.grid th.num,
+.kpi-modal-body table.grid td.num { text-align: right; }
+.kpi-modal-empty { padding: var(--space-5); text-align: center; color: var(--text-secondary); font-size: 13px; }

@@ -401,6 +401,26 @@
     </main>
   </div>
 
+  <div class="kpi-modal-overlay" id="kpiModal" hidden>
+    <div class="kpi-modal" role="dialog" aria-modal="true" aria-labelledby="kpiModalTitle">
+      <div class="kpi-modal-head">
+        <div>
+          <h2 id="kpiModalTitle"></h2>
+          <div class="kpi-modal-count" id="kpiModalCount"></div>
+        </div>
+        <div class="kpi-modal-actions">
+          <input type="search" id="kpiModalSearch" placeholder="Search these records..." autocomplete="off">
+          <button type="button" class="export-link" id="kpiModalExport">Export CSV</button>
+          <button type="button" class="kpi-modal-close" id="kpiModalClose" aria-label="Close">&times;</button>
+        </div>
+      </div>
+      <div class="kpi-modal-body">
+        <table class="grid" id="kpiModalTable"></table>
+        <div class="kpi-modal-empty" id="kpiModalEmpty" hidden>No records match.</div>
+      </div>
+    </div>
+  </div>
+
   <script src="scan-dashboard.js"></script>
 </body>
 </html>

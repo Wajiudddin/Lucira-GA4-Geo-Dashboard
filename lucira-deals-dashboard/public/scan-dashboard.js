@@ -699,7 +699,168 @@ function buildCustomerAnalysis(scanEvents, partyNames) {
 // -----------------------------------------------------------------------
 // Overview
 // -----------------------------------------------------------------------
-function renderKpis(kpis, kpiTrends) {
+// -----------------------------------------------------------------------
+// KPI drill-down popup — clicking a KPI card lists the records behind it
+// -----------------------------------------------------------------------
+const dash = v => (v === null || v === undefined || v === '' ? '—' : v);
+const colText = (label, get) => ({ label, get: r => { const v = get(r); return { v: v ?? '', t: dash(v) }; } });
+const colDate = (label, get) => ({ label, get: r => { const v = get(r); return { v: v || '', t: formatDateOnly(v) }; } });
+const colNum = (label, get) => ({ label, num: true, get: r => { const v = get(r); return { v: v ?? 0, t: v == null ? '—' : formatCount(v) }; } });
+const colMoney = (label, get) => ({ label, num: true, get: r => { const v = get(r); return { v: v ?? 0, t: v == null ? '—' : '₹' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(v) }; } });
+
+// One row per product (item_id) across all stores — matches how the
+// Overview KPIs count "unique products".
+function aggregateByItem(scanEvents) {
+  const map = new Map();
+  for (const e of scanEvents) {
+    if (!map.has(e.itemId)) {
+      map.set(e.itemId, {
+        itemCode: e.itemCode, itemName: e.itemName, category: e.category, collection: e.collection,
+        metal: e.metal, size: e.size, price: e.price, stores: new Set(), scanCount: 0,
+        firstScan: null, lastScan: null, sold: false, saleLines: new Map(),
+      });
+    }
+    const r = map.get(e.itemId);
+    r.scanCount += 1;
+    if (e.store) r.stores.add(e.store);
+    if (e.date && (!r.firstScan || e.date < r.firstScan)) r.firstScan = e.date;
+    if (e.date && (!r.lastScan || e.date > r.lastScan)) r.lastScan = e.date;
+    if (e.sold) {
+      r.sold = true;
+      if (e.itemLineNo && !r.saleLines.has(e.itemLineNo)) r.saleLines.set(e.itemLineNo, e.sale);
+    }
+  }
+  return [...map.values()].map(r => ({
+    ...r,
+    stores: [...r.stores].sort().join(', '),
+    soldLabel: r.sold ? 'Sold' : 'Not sold',
+    saleValue: round2([...r.saleLines.values()].reduce((s, x) => s + x.netSale, 0)),
+  }));
+}
+
+const PRODUCT_COLUMNS = [
+  colText('Item Code', r => r.itemCode), colText('Item Name', r => r.itemName),
+  colText('Category', r => r.category), colText('Collection', r => r.collection),
+  colText('Stores', r => r.stores), colNum('Scans', r => r.scanCount),
+  colDate('First Scanned', r => r.firstScan), colDate('Last Scanned', r => r.lastScan),
+  colText('Status', r => r.soldLabel), colMoney('Price', r => r.price),
+];
+
+function buildKpiDetails(walkins, scanEvents, notScannedItems) {
+  const byItem = aggregateByItem(scanEvents);
+  const byPhone = new Map();
+  for (const w of walkins) {
+    if (!w.phone) continue;
+    if (!byPhone.has(w.phone)) byPhone.set(w.phone, { phone: w.phone, name: w.customerName, stores: new Set(), visits: 0, lastVisit: null });
+    const r = byPhone.get(w.phone);
+    r.visits += 1;
+    if (!r.name && w.customerName) r.name = w.customerName;
+    if (w.store) r.stores.add(w.store);
+    if (w.date && (!r.lastVisit || w.date > r.lastVisit)) r.lastVisit = w.date;
+  }
+  const visitors = [...byPhone.values()].map(r => ({ ...r, stores: [...r.stores].sort().join(', ') }));
+  const sales = uniqueSales(scanEvents);
+  const neverScannedCols = [
+    colText('Item Code', r => r.itemCode), colText('Item Name', r => r.itemName), colText('Store', r => r.store),
+    colText('Category', r => r.category), colText('Collection', r => r.collection),
+    colNum('Pieces', r => r.piecesOnHand), colMoney('Price', r => r.price),
+    colMoney('Inventory Value', r => r.inventoryValue), colNum('Ageing (days)', r => r.ageingDays),
+  ];
+  return {
+    walkins: { title: 'Total Walk-ins', rows: walkins, columns: [
+      colDate('Date', r => r.date), colText('Store', r => r.store), colText('Customer', r => r.customerName), colText('Phone', r => r.phone) ] },
+    visitors: { title: 'Unique Visitors', rows: visitors, columns: [
+      colText('Phone', r => r.phone), colText('Customer', r => r.name), colText('Stores', r => r.stores),
+      colNum('Visits', r => r.visits), colDate('Last Visit', r => r.lastVisit) ] },
+    scanEvents: { title: 'Total Scan Events', rows: scanEvents, columns: [
+      colDate('Date', r => r.date), colText('Store', r => r.store), colText('Item Code', r => r.itemCode),
+      colText('Item Name', r => r.itemName), colText('Category', r => r.category), colText('Collection', r => r.collection),
+      colMoney('Price', r => r.price), colText('Status', r => (r.sold ? 'Sold' : 'Not sold')) ] },
+    uniqueProducts: { title: 'Unique Products Scanned', rows: byItem, columns: PRODUCT_COLUMNS },
+    scannedSold: { title: 'Scanned & Sold', rows: byItem.filter(r => r.sold), columns: [...PRODUCT_COLUMNS, colMoney('Sale Value', r => r.saleValue)] },
+    conversion: { title: 'Scan → Sale Conversion (all scanned products)', rows: byItem, columns: PRODUCT_COLUMNS },
+    sales: { title: 'Sales Value (Scanned)', rows: sales, columns: [
+      colDate('Sale Date', r => r.date), colText('Store', r => r.store), colText('Document', r => r.documentNo),
+      colText('SKU', r => r.fullSku), colText('Category', r => r.category), colText('Collection', r => r.collection),
+      colText('Customer', r => r.partyName), colNum('Pieces', r => r.pieces), colMoney('Net Sale', r => r.netSale) ] },
+    scannedNotSold: { title: 'Scanned but Not Sold', rows: byItem.filter(r => !r.sold), columns: PRODUCT_COLUMNS },
+    neverScanned: { title: 'Never Scanned Products', rows: notScannedItems, columns: neverScannedCols },
+    neverScannedValue: { title: 'Never Scanned Inventory Value', rows: [...notScannedItems].sort((a, b) => (b.inventoryValue || 0) - (a.inventoryValue || 0)), columns: neverScannedCols },
+  };
+}
+
+const kpiModal = (() => {
+  const overlay = document.getElementById('kpiModal');
+  const titleEl = document.getElementById('kpiModalTitle');
+  const countEl = document.getElementById('kpiModalCount');
+  const searchEl = document.getElementById('kpiModalSearch');
+  const table = document.getElementById('kpiModalTable');
+  const emptyEl = document.getElementById('kpiModalEmpty');
+  let detail = null;
+  let sortIdx = -1;
+  let sortDir = 1;
+
+  function render() {
+    const term = searchEl.value.trim().toLowerCase();
+    let rows = detail.rows.map(r => detail.columns.map(c => c.get(r)));
+    if (term) rows = rows.filter(cells => cells.some(c => String(c.t).toLowerCase().includes(term)));
+    if (sortIdx >= 0) {
+      const num = detail.columns[sortIdx].num;
+      rows.sort((a, b) => {
+        const x = a[sortIdx].v, y = b[sortIdx].v;
+        return sortDir * (num ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true }));
+      });
+    }
+    countEl.textContent = `${formatCount(rows.length)} of ${formatCount(detail.rows.length)} records`;
+    emptyEl.hidden = rows.length > 0;
+
+    table.innerHTML = '';
+    const head = table.createTHead().insertRow();
+    detail.columns.forEach((c, i) => {
+      const th = document.createElement('th');
+      th.textContent = c.label + (i === sortIdx ? (sortDir > 0 ? ' ▲' : ' ▼') : '');
+      th.dataset.raw = c.label;
+      if (c.num) th.className = 'num';
+      th.addEventListener('click', () => { sortDir = sortIdx === i ? -sortDir : 1; sortIdx = i; render(); });
+      head.appendChild(th);
+    });
+    const body = table.createTBody();
+    const frag = document.createDocumentFragment();
+    rows.forEach(cells => {
+      const tr = document.createElement('tr');
+      cells.forEach((c, i) => tr.appendChild(cell(c.t, detail.columns[i].num ? 'num' : '', false, c.v)));
+      frag.appendChild(tr);
+    });
+    body.appendChild(frag);
+  }
+
+  function open(d) {
+    detail = d;
+    sortIdx = -1; sortDir = 1;
+    searchEl.value = '';
+    titleEl.textContent = d.title;
+    overlay.hidden = false;
+    document.body.classList.add('modal-open');
+    render();
+    searchEl.focus();
+  }
+  function close() {
+    overlay.hidden = true;
+    document.body.classList.remove('modal-open');
+  }
+
+  searchEl.addEventListener('input', render);
+  document.getElementById('kpiModalClose').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !overlay.hidden) close(); });
+  document.getElementById('kpiModalExport').addEventListener('click', () => {
+    if (!detail) return;
+    downloadCSV(detail.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase(), tableToCSV(table));
+  });
+  return { open };
+})();
+
+function renderKpis(kpis, kpiTrends, details) {
   const container = document.getElementById('kpiGrid');
   container.innerHTML = '';
   function trendHtml(pct) {
@@ -709,20 +870,26 @@ function renderKpis(kpis, kpiTrends) {
     return `<div class="kpi-trend is-${dir}">${arrow} ${Math.abs(pct).toFixed(1)}% vs last week</div>`;
   }
   const cards = [
-    { label: 'Total Walk-ins', value: formatCount(kpis.totalWalkins), trend: kpiTrends.walkins },
-    { label: 'Unique Visitors', value: formatCount(kpis.uniqueWalkinPhones) },
-    { label: 'Total Scan Events', value: formatCount(kpis.totalScanEvents), trend: kpiTrends.scans },
-    { label: 'Unique Products Scanned', value: formatCount(kpis.uniqueProductsScanned) },
-    { label: 'Scanned & Sold', value: formatCount(kpis.scannedAndSoldItems) },
-    { label: 'Scan → Sale Conversion', value: `${kpis.scanToSaleConversionPct}%`, gold: true },
-    { label: 'Sales Value (Scanned)', value: formatAmount(kpis.salesValueFromScanned), trend: kpiTrends.revenue },
-    { label: 'Scanned but Not Sold', value: formatCount(kpis.scannedButNotSoldItems) },
-    { label: 'Never Scanned Products', value: formatCount(kpis.neverScannedItems) },
-    { label: 'Never Scanned Inventory Value', value: formatAmount(kpis.neverScannedValue) },
+    { label: 'Total Walk-ins', detail: 'walkins', value: formatCount(kpis.totalWalkins), trend: kpiTrends.walkins },
+    { label: 'Unique Visitors', detail: 'visitors', value: formatCount(kpis.uniqueWalkinPhones) },
+    { label: 'Total Scan Events', detail: 'scanEvents', value: formatCount(kpis.totalScanEvents), trend: kpiTrends.scans },
+    { label: 'Unique Products Scanned', detail: 'uniqueProducts', value: formatCount(kpis.uniqueProductsScanned) },
+    { label: 'Scanned & Sold', detail: 'scannedSold', value: formatCount(kpis.scannedAndSoldItems) },
+    { label: 'Scan → Sale Conversion', detail: 'conversion', value: `${kpis.scanToSaleConversionPct}%`, gold: true },
+    { label: 'Sales Value (Scanned)', detail: 'sales', value: formatAmount(kpis.salesValueFromScanned), trend: kpiTrends.revenue },
+    { label: 'Scanned but Not Sold', detail: 'scannedNotSold', value: formatCount(kpis.scannedButNotSoldItems) },
+    { label: 'Never Scanned Products', detail: 'neverScanned', value: formatCount(kpis.neverScannedItems) },
+    { label: 'Never Scanned Inventory Value', detail: 'neverScannedValue', value: formatAmount(kpis.neverScannedValue) },
   ];
   cards.forEach(k => {
     const card = document.createElement('div');
-    card.className = 'kpi-card';
+    card.className = 'kpi-card is-clickable';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.title = 'Click to view the records';
+    const openDetail = () => kpiModal.open(details[k.detail]);
+    card.addEventListener('click', openDetail);
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(); } });
     card.innerHTML = `
       <div class="kpi-card-top">
         <div class="kpi-label">${k.label}</div>
@@ -1162,7 +1329,7 @@ function renderAll(data) {
     revenue: weekOverWeekPct(weeklyTrend, today, 'revenue'),
   };
 
-  renderKpis(kpis, kpiTrends);
+  renderKpis(kpis, kpiTrends, buildKpiDetails(walkins, scanEvents, notScannedItems));
   renderFunnel(kpis);
   renderOverviewCharts(weeklyTrend, storeFunnel);
   renderFunnelTable(storeFunnel);
