@@ -1359,12 +1359,18 @@ document.querySelectorAll('.sidebar-link').forEach(btn => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('is-active'));
     btn.classList.add('is-active');
     document.getElementById(btn.dataset.panel).classList.add('is-active');
-    document.getElementById('sidebar').classList.remove('is-open');
+    setSidebarOpen(false);
   });
 });
+function setSidebarOpen(open) {
+  document.getElementById('sidebar').classList.toggle('is-open', open);
+  document.getElementById('sidebarBackdrop').hidden = !open;
+}
 document.getElementById('sidebarToggle').addEventListener('click', () => {
-  document.getElementById('sidebar').classList.toggle('is-open');
+  setSidebarOpen(!document.getElementById('sidebar').classList.contains('is-open'));
 });
+document.getElementById('sidebarBackdrop').addEventListener('click', () => setSidebarOpen(false));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') setSidebarOpen(false); });
 
 // -----------------------------------------------------------------------
 // Load + wire up
