@@ -1204,3 +1204,6 @@ body.modal-open { overflow: hidden; }
 .kpi-modal-body table.grid th.num,
 .kpi-modal-body table.grid td.num { text-align: right; }
 .kpi-modal-empty { padding: var(--space-5); text-align: center; color: var(--text-secondary); font-size: 13px; }
+
+.funnel-stage.is-clickable { cursor: pointer; }
+.funnel-stage.is-clickable:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

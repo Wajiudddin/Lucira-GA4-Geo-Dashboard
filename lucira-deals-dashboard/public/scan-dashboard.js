@@ -746,6 +746,13 @@ const PRODUCT_COLUMNS = [
   colText('Status', r => r.soldLabel), colMoney('Price', r => r.price),
 ];
 
+const NEVER_SCANNED_COLUMNS = [
+  colText('Item Code', r => r.itemCode), colText('Item Name', r => r.itemName), colText('Store', r => r.store),
+  colText('Category', r => r.category), colText('Collection', r => r.collection),
+  colNum('Pieces', r => r.piecesOnHand), colMoney('Price', r => r.price),
+  colMoney('Inventory Value', r => r.inventoryValue), colNum('Ageing (days)', r => r.ageingDays),
+];
+
 function buildKpiDetails(walkins, scanEvents, notScannedItems) {
   const byItem = aggregateByItem(scanEvents);
   const byPhone = new Map();
@@ -760,12 +767,7 @@ function buildKpiDetails(walkins, scanEvents, notScannedItems) {
   }
   const visitors = [...byPhone.values()].map(r => ({ ...r, stores: [...r.stores].sort().join(', ') }));
   const sales = uniqueSales(scanEvents);
-  const neverScannedCols = [
-    colText('Item Code', r => r.itemCode), colText('Item Name', r => r.itemName), colText('Store', r => r.store),
-    colText('Category', r => r.category), colText('Collection', r => r.collection),
-    colNum('Pieces', r => r.piecesOnHand), colMoney('Price', r => r.price),
-    colMoney('Inventory Value', r => r.inventoryValue), colNum('Ageing (days)', r => r.ageingDays),
-  ];
+  const neverScannedCols = NEVER_SCANNED_COLUMNS;
   return {
     walkins: { title: 'Total Walk-ins', rows: walkins, columns: [
       colDate('Date', r => r.date), colText('Store', r => r.store), colText('Customer', r => r.customerName), colText('Phone', r => r.phone) ] },
@@ -883,13 +885,8 @@ function renderKpis(kpis, kpiTrends, details) {
   ];
   cards.forEach(k => {
     const card = document.createElement('div');
-    card.className = 'kpi-card is-clickable';
-    card.tabIndex = 0;
-    card.setAttribute('role', 'button');
-    card.title = 'Click to view the records';
-    const openDetail = () => kpiModal.open(details[k.detail]);
-    card.addEventListener('click', openDetail);
-    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(); } });
+    card.className = 'kpi-card';
+    makeCardClickable(card, () => details[k.detail]);
     card.innerHTML = `
       <div class="kpi-card-top">
         <div class="kpi-label">${k.label}</div>
@@ -902,15 +899,15 @@ function renderKpis(kpis, kpiTrends, details) {
   });
 }
 
-function renderFunnel(kpis) {
+function renderFunnel(kpis, details) {
   const row = document.getElementById('funnelRow');
   row.innerHTML = '';
   const scannedPct = kpis.totalWalkins ? Math.round((kpis.uniqueProductsScanned / kpis.totalWalkins) * 1000) / 10 : 0;
   const soldPct = kpis.scanToSaleConversionPct;
   const stages = [
-    { label: 'Walk-ins', value: formatCount(kpis.totalWalkins), sub: null, gold: false },
-    { label: 'Scan Events', value: formatCount(kpis.totalScanEvents), sub: `<span class="pct">${formatCount(kpis.uniqueProductsScanned)}</span> unique products`, gold: false },
-    { label: 'Scanned & Sold', value: formatCount(kpis.scannedAndSoldItems), sub: `<span class="pct">${soldPct}%</span> conversion`, gold: true },
+    { label: 'Walk-ins', detail: 'walkins', value: formatCount(kpis.totalWalkins), sub: null, gold: false },
+    { label: 'Scan Events', detail: 'scanEvents', value: formatCount(kpis.totalScanEvents), sub: `<span class="pct">${formatCount(kpis.uniqueProductsScanned)}</span> unique products`, gold: false },
+    { label: 'Scanned & Sold', detail: 'scannedSold', value: formatCount(kpis.scannedAndSoldItems), sub: `<span class="pct">${soldPct}%</span> conversion`, gold: true },
   ];
   stages.forEach((s, i) => {
     if (i > 0) {
@@ -926,6 +923,7 @@ function renderFunnel(kpis) {
       <div class="funnel-stage-value${s.gold ? ' is-gold' : ''}">${s.value}</div>
       ${s.sub ? `<div class="funnel-stage-sub">${s.sub}</div>` : ''}
     `;
+    makeCardClickable(stage, () => details[s.detail]);
     row.appendChild(stage);
   });
   void scannedPct;
@@ -1070,11 +1068,47 @@ const customerTable = makeItemTable({
   searchFields: ['name', 'partyId'], exportFilename: 'customer-analysis', tableId: 'customerTable',
 });
 
-function kpiCard(label, value, gold) {
+function makeCardClickable(card, getDetail) {
+  card.classList.add('is-clickable');
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+  card.title = 'Click to view the records';
+  const open = () => kpiModal.open(getDetail());
+  card.addEventListener('click', open);
+  card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+}
+
+function kpiCard(label, value, gold, detail) {
   const card = document.createElement('div');
   card.className = 'kpi-card';
   card.innerHTML = `<div class="kpi-label">${label}</div><div class="kpi-value${gold ? ' is-gold' : ''}">${value}</div>`;
+  if (detail) makeCardClickable(card, () => detail);
   return card;
+}
+
+// Store-level (item + store) scan stats, and the same rolled up to one row per product.
+const ITEM_STORE_COLUMNS = [
+  colText('Item Code', r => r.itemCode), colText('Item Name', r => r.itemName), colText('Store', r => r.store),
+  colText('Category', r => r.category), colText('Collection', r => r.collection),
+  colNum('Scans', r => r.scanCount), colDate('First Scanned', r => r.firstScanDate), colDate('Last Scanned', r => r.lastScanDate),
+  colText('Status', r => (r.sold ? 'Sold' : 'Not sold')), colNum('Qty Sold', r => r.saleQty),
+  colMoney('Price', r => r.price), colMoney('Sale Value', r => r.saleValue),
+];
+const ITEM_COLUMNS = [
+  colText('Item Code', r => r.itemCode), colText('Item Name', r => r.itemName), colText('Stores', r => r.stores),
+  colText('Category', r => r.category), colText('Collection', r => r.collection),
+  colNum('Scans', r => r.scanCount), colText('Status', r => (r.sold ? 'Sold' : 'Not sold')),
+  colNum('Qty Sold', r => r.saleQty), colMoney('Price', r => r.price), colMoney('Sale Value', r => r.saleValue),
+];
+function mergeItemStatsByItem(items) {
+  const map = new Map();
+  for (const i of items) {
+    if (!map.has(i.itemId)) map.set(i.itemId, { ...i, stores: new Set(), scanCount: 0, saleQty: 0, saleValue: 0 });
+    const r = map.get(i.itemId);
+    if (i.store) r.stores.add(i.store);
+    r.scanCount += i.scanCount; r.saleQty += i.saleQty; r.saleValue += i.saleValue;
+  }
+  return [...map.values()].map(r => ({ ...r, stores: [...r.stores].sort().join(', '), saleValue: round2(r.saleValue) }));
 }
 
 // Rolls the (item, store) rows back up to one row per item, for items sold
@@ -1121,10 +1155,11 @@ function renderScannedSoldTab(itemStats) {
   const uniqueProducts = new Set(items.map(i => i.itemId)).size;
   const container = document.getElementById('scannedSoldKpiGrid');
   container.innerHTML = '';
-  container.appendChild(kpiCard('Unique Products Sold', formatCount(uniqueProducts)));
-  container.appendChild(kpiCard('Total Sales Value', formatAmount(round2(items.reduce((s, i) => s + i.saleValue, 0))), true));
-  container.appendChild(kpiCard('Items Sold (Qty)', formatCount(items.reduce((s, i) => s + i.saleQty, 0))));
-  container.appendChild(kpiCard('Total Scan Events', formatCount(items.reduce((s, i) => s + i.scanCount, 0))));
+  const storeRows = (title) => ({ title, rows: items, columns: ITEM_STORE_COLUMNS });
+  container.appendChild(kpiCard('Unique Products Sold', formatCount(uniqueProducts), false, { title: 'Unique Products Sold', rows: mergeItemStatsByItem(items), columns: ITEM_COLUMNS }));
+  container.appendChild(kpiCard('Total Sales Value', formatAmount(round2(items.reduce((s, i) => s + i.saleValue, 0))), true, storeRows('Total Sales Value (by product and store)')));
+  container.appendChild(kpiCard('Items Sold (Qty)', formatCount(items.reduce((s, i) => s + i.saleQty, 0)), false, storeRows('Items Sold (by product and store)')));
+  container.appendChild(kpiCard('Total Scan Events', formatCount(items.reduce((s, i) => s + i.scanCount, 0)), false, storeRows('Scan Events (by product and store)')));
 
   renderSummaryTable('scannedSoldStoreContainer', summarizeItemsBy(items, i => i.store));
   renderRankedList('scannedSoldCategoryContainer', summarizeItemsBy(items, i => i.category));
@@ -1167,15 +1202,16 @@ function renderScannedNotSoldTab(itemStats) {
   const container = document.getElementById('scannedNotSoldKpiGrid');
   container.innerHTML = '';
   const totalValue = items.reduce((s, i) => s + (i.price || 0), 0);
-  container.appendChild(kpiCard('Unique Products Scanned but Unsold', formatCount(uniqueProducts)));
-  const rowsCard = kpiCard('Store-level Rows', formatCount(items.length));
+  const storeRows = (title) => ({ title, rows: items, columns: ITEM_STORE_COLUMNS });
+  container.appendChild(kpiCard('Unique Products Scanned but Unsold', formatCount(uniqueProducts), false, { title: 'Unique Products Scanned but Unsold', rows: mergeItemStatsByItem(items), columns: ITEM_COLUMNS }));
+  const rowsCard = kpiCard('Store-level Rows', formatCount(items.length), false, storeRows('Store-level Rows (scanned but not sold)'));
   const rowsNote = document.createElement('div');
   rowsNote.className = 'kpi-trend is-flat';
   rowsNote.textContent = items.length !== uniqueProducts ? `${formatCount(items.length - uniqueProducts)} product(s) unsold at more than 1 store` : 'One row per product, no multi-store overlap';
   rowsCard.appendChild(rowsNote);
   container.appendChild(rowsCard);
-  container.appendChild(kpiCard('Total Value', formatAmount(round2(totalValue)), true));
-  container.appendChild(kpiCard('Total Scan Events', formatCount(items.reduce((s, i) => s + i.scanCount, 0))));
+  container.appendChild(kpiCard('Total Value', formatAmount(round2(totalValue)), true, storeRows('Total Value (scanned but not sold)')));
+  container.appendChild(kpiCard('Total Scan Events', formatCount(items.reduce((s, i) => s + i.scanCount, 0)), false, storeRows('Scan Events (scanned but not sold)')));
 
   renderTopScannedNotSoldTable(items, 10);
 
@@ -1190,8 +1226,12 @@ function renderNotScannedTab(items) {
   const container = document.getElementById('notScannedKpiGrid');
   container.innerHTML = '';
   const totalValue = items.reduce((s, i) => s + (i.inventoryValue || 0), 0);
-  container.appendChild(kpiCard('Never-scanned Items', formatCount(items.length)));
-  container.appendChild(kpiCard('Total Inventory Value', formatAmount(round2(totalValue)), true));
+  container.appendChild(kpiCard('Never-scanned Items', formatCount(items.length), false, { title: 'Never-scanned Items', rows: items, columns: NEVER_SCANNED_COLUMNS }));
+  container.appendChild(kpiCard('Total Inventory Value', formatAmount(round2(totalValue)), true, {
+    title: 'Never-scanned Inventory Value',
+    rows: [...items].sort((a, b) => (b.inventoryValue || 0) - (a.inventoryValue || 0)),
+    columns: NEVER_SCANNED_COLUMNS,
+  }));
 
   renderSummaryTable('notScannedStoreContainer', summarizeItemsBy(items, i => i.store));
   renderRankedList('notScannedCategoryContainer', summarizeItemsBy(items, i => i.category));
@@ -1209,16 +1249,33 @@ function renderCustomerTab(scanEvents, partyNames) {
 
   const container = document.getElementById('customerKpiGrid');
   container.innerHTML = '';
-  container.appendChild(kpiCard('Customers Identified', formatCount(customers.length)));
+  const customerCols = [
+    colText('Customer', r => r.name), colNum('Scanned', r => r.scanned), colNum('Purchased', r => r.purchased),
+    colNum('Not Purchased', r => r.notPurchased), colText('Conversion %', r => `${r.conversionPct}%`),
+    colText('Stores', r => r.stores), colText('Identified By', r => r.identitySource),
+  ];
+  const customerDetail = title => ({ title, rows: customers, columns: customerCols });
+  container.appendChild(kpiCard('Customers Identified', formatCount(customers.length), false, customerDetail('Customers Identified')));
   const purchasingPartyIds = new Set(customers.map(c => c.partyId));
-  const attributedScanEvents = scanEvents.filter(s => purchasingPartyIds.has(s.resolvedPartyId)).length;
-  container.appendChild(kpiCard('Attributed Scan Events', formatCount(attributedScanEvents)));
-  const attributedUniqueProductsSold = new Set(scanEvents.filter(s => s.resolvedPartyId && s.sold).map(s => s.itemId)).size;
-  container.appendChild(kpiCard('Products Sold', formatCount(attributedUniqueProductsSold), true));
+  const attributedEvents = scanEvents.filter(s => purchasingPartyIds.has(s.resolvedPartyId));
+  container.appendChild(kpiCard('Attributed Scan Events', formatCount(attributedEvents.length), false, {
+    title: 'Attributed Scan Events',
+    rows: attributedEvents.map(e => ({ ...e, customer: partyNames[e.resolvedPartyId] || `Customer #${e.resolvedPartyId}` })),
+    columns: [
+      colDate('Date', r => r.date), colText('Customer', r => r.customer), colText('Store', r => r.store),
+      colText('Item Code', r => r.itemCode), colText('Item Name', r => r.itemName), colText('Category', r => r.category),
+      colMoney('Price', r => r.price), colText('Status', r => (r.sold ? 'Sold' : 'Not sold')),
+    ],
+  }));
+  const soldAttributed = scanEvents.filter(s => s.resolvedPartyId && s.sold);
+  const attributedUniqueProductsSold = new Set(soldAttributed.map(s => s.itemId)).size;
+  container.appendChild(kpiCard('Products Sold', formatCount(attributedUniqueProductsSold), true, {
+    title: 'Products Sold (identified customers)', rows: aggregateByItem(soldAttributed), columns: [...PRODUCT_COLUMNS, colMoney('Sale Value', r => r.saleValue)],
+  }));
   const avgConv = customers.length ? round2(customers.reduce((s, c) => s + c.conversionPct, 0) / customers.length) : 0;
   const directOnly = customers.filter(c => c.identitySource !== 'Matched sale only');
   const avgConvDirect = directOnly.length ? round2(directOnly.reduce((s, c) => s + c.conversionPct, 0) / directOnly.length) : 0;
-  const avgConvCard = kpiCard('Avg. Conversion % (skewed by matched-sale-only rows)', `${avgConv}%`);
+  const avgConvCard = kpiCard('Avg. Conversion % (skewed by matched-sale-only rows)', `${avgConv}%`, false, customerDetail('Customers (conversion %)'));
   const directNote = document.createElement('div');
   directNote.className = 'kpi-trend is-flat';
   directNote.textContent = `${avgConvDirect}% among customers with their own scan-level party_id`;
@@ -1329,8 +1386,9 @@ function renderAll(data) {
     revenue: weekOverWeekPct(weeklyTrend, today, 'revenue'),
   };
 
-  renderKpis(kpis, kpiTrends, buildKpiDetails(walkins, scanEvents, notScannedItems));
-  renderFunnel(kpis);
+  const kpiDetails = buildKpiDetails(walkins, scanEvents, notScannedItems);
+  renderKpis(kpis, kpiTrends, kpiDetails);
+  renderFunnel(kpis, kpiDetails);
   renderOverviewCharts(weeklyTrend, storeFunnel);
   renderFunnelTable(storeFunnel);
 
