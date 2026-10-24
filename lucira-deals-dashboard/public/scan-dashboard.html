@@ -46,7 +46,7 @@
       </nav>
       <div class="sidebar-foot">
         Source: <strong>BigQuery</strong><br />
-        Walkin_marge &middot; Pos.estimation_item_scan &middot; ds_imputed_reporting.items &middot; marketing_sale &middot; Live_inventory
+        Lucira_Prod.customer_walkin &middot; Pos.estimation_item_scan &middot; ds_imputed_reporting.items &middot; marketing_sale &middot; Live_inventory
       </div>
     </aside>
 
@@ -363,10 +363,10 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td>ds_imputed_reporting.Walkin_marge</td>
+                    <td>Lucira_Prod.customer_walkin</td>
                     <td>Walk-ins</td>
-                    <td>store_code, customer_name, phone, walkin_date</td>
-                    <td>One row per store visit. Date taken from the walkin_date text.</td>
+                    <td>company_id, first_name, last_name, mobile, date</td>
+                    <td>One row per store visit. Store comes from company_id.</td>
                   </tr>
                   <tr>
                     <td>Pos.estimation_item_scan</td>

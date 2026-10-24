@@ -21,6 +21,7 @@ const COMPANY_ID_TO_CODE = {
   7: 'FCS',
   8: 'PV1',
   9: 'LPN',
+  10: 'MAL',
 };
 
 // FCS is HWI Ventures' ERP code — displayed as "HWI" everywhere else in this
@@ -101,24 +102,28 @@ function idStr(v) {
 
 // --- BigQuery fetches -------------------------------------------------------
 
-// Walk-ins are logged as one row per visit (event_name = 'StoreVisit'),
-// walkin_date is a plain "YYYY-MM-DD HH:MM:SS" string, not a native
-// TIMESTAMP/DATE column, so the date-only slice is taken in JS below.
+// Walk-ins: Lucira_Prod.customer_walkin, one row per store visit. `date` is a
+// DATETIME (the date-only slice is taken in JS below) and the store is
+// resolved from company_id with the same map the scan table uses.
 async function fetchWalkins() {
   const [rows] = await bigquery.query({
     query: `
-      SELECT store_code, customer_name, phone, walkin_date
-      FROM \`lucirajewelry-prod.ds_imputed_reporting.Walkin_marge\`
-      WHERE walkin_date IS NOT NULL
+      SELECT company_id, first_name, last_name, mobile, date
+      FROM \`lucirajewelry-prod.Lucira_Prod.customer_walkin\`
+      WHERE date IS NOT NULL
     `,
   });
-  return rows.map(r => ({
-    storeCode: r.store_code || null,
-    store: displayStore(r.store_code),
-    customerName: r.customer_name || null,
-    phone: r.phone || null,
-    date: String(r.walkin_date).slice(0, 10),
-  }));
+  return rows.map(r => {
+    const storeCode = COMPANY_ID_TO_CODE[r.company_id] || null;
+    const name = [r.first_name, r.last_name].filter(Boolean).join(' ').trim();
+    return {
+      storeCode,
+      store: displayStore(storeCode),
+      customerName: name || null,
+      phone: r.mobile || null,
+      date: String(bqVal(r.date)).slice(0, 10),
+    };
+  });
 }
 
 // THE SCAN TABLE — one row per scan event, no dedup, no fan-out join.
