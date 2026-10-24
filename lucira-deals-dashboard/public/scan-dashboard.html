@@ -347,6 +347,56 @@
             <div class="logic-flow-step">Never Scanned (stock that was never scanned)</div>
           </div>
         </div>
+
+        <div class="logic-card logic-source-card">
+          <h2>Source Tables</h2>
+          <div class="table-shell">
+            <div class="table-scroll">
+              <table class="grid" id="sourceTable">
+                <thead>
+                  <tr>
+                    <th>Source Table (BigQuery)</th>
+                    <th>Used For</th>
+                    <th>Key Fields</th>
+                    <th>Grain / Handling</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>ds_imputed_reporting.Walkin_marge</td>
+                    <td>Walk-ins</td>
+                    <td>store_code, customer_name, phone, walkin_date</td>
+                    <td>One row per store visit. Date taken from the walkin_date text.</td>
+                  </tr>
+                  <tr>
+                    <td>Pos.estimation_item_scan</td>
+                    <td>Scan Events, Unique Products Scanned, Customer Analysis</td>
+                    <td>id, item_id, item_line_no, date, company_id, party_id</td>
+                    <td>One row per scan, no de-duplication. Store comes from company_id. party_id is mostly empty.</td>
+                  </tr>
+                  <tr>
+                    <td>ds_imputed_reporting.items</td>
+                    <td>Scan item code</td>
+                    <td>item_id, item_code</td>
+                    <td>Joined to scans on item_id. One row per item, so scan counts are not inflated.</td>
+                  </tr>
+                  <tr>
+                    <td>ds_imputed_reporting.Live_inventory</td>
+                    <td>Never Scanned, item details (category, collection, metal, size, price)</td>
+                    <td>item_id, Store_name, item_rate, document_no, document_date, pieces, type_name, collection_name, metal_name</td>
+                    <td>Item details: one row per item. Never Scanned: one row per item per store. Never used to count scans or decide sales.</td>
+                  </tr>
+                  <tr>
+                    <td>ds_imputed_reporting.marketing_sale</td>
+                    <td>Scanned &amp; Sold, Customer Analysis (customer names)</td>
+                    <td>item_line_no, company_code, Transaction_Date, net_sale, pieces, Price_Range, party_id, party_name</td>
+                    <td>Grouped by item_line_no first so a scan matches at most one sale. A sale counts only at the same store as the scan.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
   </div>

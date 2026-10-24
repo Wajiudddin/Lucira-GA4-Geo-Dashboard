@@ -1079,6 +1079,10 @@ table.grid tbody tr:hover td.sticky-col { background: #FBFAF7; }
 }
 .logic-flow-arrow { text-align: center; color: var(--gold-light); font-size: 13px; }
 
+.logic-source-card { margin-top: var(--space-4); }
+#sourceTable tbody td { vertical-align: top; white-space: normal; line-height: 1.5; }
+#sourceTable tbody td:first-child { font-weight: 600; white-space: nowrap; }
+
 /* ==========================================================================
    Tab panels
    ========================================================================== */
