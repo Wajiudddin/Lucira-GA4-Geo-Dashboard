@@ -352,11 +352,9 @@ function summarizeBy(items, keyFn, keyOrder) {
 }
 
 // Amazon (an online-channel walk-in code, no physical scans/sales of its
-// own) and HO (Head Office — not a customer-facing retail store) are
-// excluded from this dashboard entirely per business request: every KPI,
-// chart, table, and filter option is computed after removing them, so
-// neither ever appears anywhere in this dashboard, not just this one table.
-const EXCLUDED_STORE_CODES = new Set(['Amazon', 'HO']);
+// own) is excluded from this dashboard entirely. HO (Head Office) used to be
+// excluded too; it is now included so totals match the raw BigQuery tables.
+const EXCLUDED_STORE_CODES = new Set(['Amazon']);
 
 async function buildScanDashboard() {
   const today = todayISODate();
