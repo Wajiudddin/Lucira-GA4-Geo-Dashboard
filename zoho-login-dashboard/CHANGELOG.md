@@ -79,6 +79,20 @@ All work done on 2026-07-11 (Cloud Run revisions in parentheses).
   - Note: the 4 working blocks span 9 AM–9 PM, so the non-working block is treated as the
     complement (9 PM–9 AM) to keep the 5 buckets mutually exclusive.
 
+## v7 — Deals VS Call: phone match fixed (2026-11-05)
+- Repo brought in line with the deployed Cloud Run source (static/ Deals VS Call page,
+  deal_intel/, pii/, sql/, deals_vs_call.html). `static/data.js` and
+  `static/walkin_source_data.js` are deploy-time fallbacks holding customer data and are
+  git-ignored on purpose — copy them in from the deployed source before a `--source` deploy.
+- `_build_crm_bundle`: a call's match phone now comes from `To_Number__s` (outbound) /
+  `From_Number__s` (inbound, missed), then `Dialled_Number`, the Who_Id contact's mobile, and
+  only then the Subject digits. From 2026-10-29 the dialer stopped writing the number into the
+  Subject, so ~half of calls (Contact-linked, no What_Id) stopped matching and their deals were
+  shown as "Pending Call" even though they had been dialed. Rule: any dialed call clears a deal
+  from pending; only deals with zero attempts stay pending. Deployed as revision 00138.
+- Overview `meetagg` (local edit carried over, NOT yet deployed): meetings counted by
+  `created_time` in range instead of `Start_DateTime`.
+
 ## Open items
 - Lock down public access to the dashboard.
 - Rotate the Zoho admin password (was shared in chat during setup).

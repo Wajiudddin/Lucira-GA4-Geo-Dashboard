@@ -26,6 +26,11 @@
   .tabs { display:flex; gap:4px; border-bottom:1px solid #232833; margin-bottom:18px; }
   .tab { padding:10px 16px; font-size:13.5px; font-weight:600; color:#8a92a1; cursor:pointer; border-bottom:2px solid transparent; }
   .tab.active { color:#e7e9ee; border-bottom-color:#e0b64a; }
+  .topflip { display:flex; gap:6px; padding:12px 26px 0; background:#0f1115; }
+  .flip { font-size:14px; font-weight:700; padding:10px 18px; border-radius:10px 10px 0 0; border:1px solid #232833; border-bottom:0; background:#141821; color:#8a92a1; cursor:pointer; font-family:inherit; }
+  .flip.active { background:#171a21; color:#e7e9ee; border-color:#2b313c; box-shadow:inset 0 -3px 0 #e0b64a; }
+  .flip:hover { color:#e7e9ee; }
+  #stockView { border-top:1px solid #232833; }
   .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:18px; }
   .kpi { background:#171a21; border:1px solid #262b36; border-radius:14px; padding:15px 16px; }
   .kpi .n { font-size:25px; font-weight:700; } .kpi .l { color:#8a92a1; font-size:12px; margin-top:2px; }
@@ -115,7 +120,18 @@
     </div>
   </header>
 
-  <div class="wrap">
+  <div class="topflip">
+    <button class="flip active" data-flip="zoho" onclick="flipView('zoho')">🔐 Zoho — Login &amp; Status</button>
+    <button class="flip" data-flip="stock" onclick="flipView('stock')">💎 Stock — Inventory</button>
+    <button class="flip" data-flip="deals" onclick="flipView('deals')">📊 Deals VS Call</button>
+    <button class="flip" data-flip="dintel" onclick="flipView('dintel')">🎯 Deal Intelligence</button>
+    <button class="flip" data-flip="sales" onclick="flipView('sales')">📈 Sales Dashboards</button>
+    <button class="flip" data-flip="dcs" onclick="flipView('dcs')">📊 Deals vs Calls vs Sales</button>
+    <button class="flip" data-flip="walkin" onclick="flipView('walkin')">🚶 Walk-in Source</button>
+    <button class="flip" data-flip="frejun" onclick="flipView('frejun')">📞 FreJun Calls</button>
+  </div>
+
+  <div class="wrap" id="zohoView">
     <form class="filters" id="filters" onsubmit="applyFilters(event)">
       <div class="fld"><label>From</label><input type="date" id="from" value="{{ d_from }}"></div>
       <div class="fld"><label>To</label><input type="date" id="to" value="{{ d_to }}"></div>
@@ -384,8 +400,69 @@
     </div>
   </div>
 
+<div id="stockView" class="hidden">
+  <iframe id="stockFrame" title="Stock — Inventory" style="width:100%;height:calc(100vh - 150px);border:0;display:block"></iframe>
+</div>
+
+<div id="dealsView" class="hidden">
+  <iframe id="dealsFrame" title="Deals VS Call" style="width:100%;height:calc(100vh - 150px);border:0;display:block"></iframe>
+</div>
+
+<div id="dintelView" class="hidden">
+  <iframe id="dintelFrame" title="Zoho Deal Intelligence" style="width:100%;height:calc(100vh - 150px);border:0;display:block"></iframe>
+</div>
+
+<div id="salesView" class="hidden">
+  <div class="tabs" style="padding:12px 26px 0;margin-bottom:0;">
+    <div class="tab active" data-sub="intel" onclick="salesSub('intel')">💠 Sales Intelligence</div>
+    <div class="tab" data-sub="mart" onclick="salesSub('mart')">🧭 Sales Mart (Marketing × Product)</div>
+  </div>
+  <iframe id="salesFrame" title="Sales Dashboards" style="width:100%;height:calc(100vh - 190px);border:0;display:block"></iframe>
+</div>
+
+<div id="dcsView" class="hidden">
+  <iframe id="dcsFrame" title="Deals vs Calls vs Sales" style="width:100%;height:calc(100vh - 150px);border:0;display:block"></iframe>
+</div>
+
+<div id="walkinView" class="hidden">
+  <iframe id="walkinFrame" title="Walk-in Source Intelligence" style="width:100%;height:calc(100vh - 150px);border:0;display:block"></iframe>
+</div>
+
+<div id="frejunView" class="hidden">
+  <iframe id="frejunFrame" title="FreJun Call Intelligence" style="width:100%;height:calc(100vh - 150px);border:0;display:block"></iframe>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
+// ── Top-level flip: Zoho ↔ Stock ↔ Deals VS Call. Each iframe is loaded ONLY on
+//    first click of its tab, so its data source is never hit until chosen. ──
+const INV_API = "{{ inv_api }}";
+function flipView(v){
+  document.querySelectorAll('.topflip .flip').forEach(f => f.classList.toggle('active', f.dataset.flip===v));
+  const map = { zoho:'zohoView', stock:'stockView', deals:'dealsView', sales:'salesView', dcs:'dcsView', walkin:'walkinView', dintel:'dintelView', frejun:'frejunView' };
+  Object.keys(map).forEach(k => { const el = document.getElementById(map[k]); if(el) el.classList.toggle('hidden', k!==v); });
+  if(v==='stock'){ const fr = document.getElementById('stockFrame');
+    if(fr && !fr.getAttribute('src')){ fr.src = '/static/stock.html' + (INV_API ? ('?api=' + encodeURIComponent(INV_API)) : ''); } }
+  if(v==='deals'){ const fr = document.getElementById('dealsFrame');
+    if(fr && !fr.getAttribute('src')){ fr.src = '/deals-vs-call'; } }   // live Deals VS Call, lazy-loaded on first click
+  if(v==='dintel'){ const fr = document.getElementById('dintelFrame');
+    if(fr && !fr.getAttribute('src')){ fr.src = '/static/deal-intelligence.html'; } }   // Zoho Deal Intelligence, lazy-loaded on first click
+  if(v==='sales'){ const fr = document.getElementById('salesFrame');
+    if(fr && !fr.getAttribute('src')){ salesSub('intel'); } }           // default to Sales Intelligence on first open
+  if(v==='dcs'){ const fr = document.getElementById('dcsFrame');
+    if(fr && !fr.getAttribute('src')){ fr.src = '/static/deals-calls-sales.html'; } }  // lazy-loaded on first click
+  if(v==='walkin'){ const fr = document.getElementById('walkinFrame');
+    if(fr && !fr.getAttribute('src')){ fr.src = '/static/walkin-source-intelligence.html'; } }  // lazy-loaded on first click
+  if(v==='frejun'){ const fr = document.getElementById('frejunFrame');
+    if(fr && !fr.getAttribute('src')){ fr.src = '/static/frejun-calls.html'; } }  // FreJun call log, lazy-loaded on first click
+}
+// ── Sales sub-nav: swap the single iframe between the live sales dashboards. ──
+const SALES_SRC = { intel:'/static/sales-intelligence.html', mart:'/static/sales-mart-dashboard.html' };
+function salesSub(s){
+  document.querySelectorAll('#salesView .tab').forEach(el => el.classList.toggle('active', el.dataset.sub===s));
+  const fr = document.getElementById('salesFrame');
+  if(fr && fr.getAttribute('data-sub') !== s){ fr.src = SALES_SRC[s]; fr.setAttribute('data-sub', s); }
+}
 const fmtInr = v => '₹' + Math.round(v||0).toLocaleString('en-IN');
 const fmtHrs = v => (v||0).toFixed(1);
 // hours -> "42m" | "3h 20m"
@@ -507,8 +584,7 @@ async function loadUsers(){
         <td class="num">${u.online_acts}</td>
       </tr>`).join('');
     el.innerHTML = `<div class="tblwrap"><table>
-      <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Online</th>
-        <th class="num">Active hrs</th><th>Last activity</th><th class="num">Login (polled)</th>
+      <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Online</th>        <th class="num">Active hrs</th><th>Last activity</th><th class="num">Login (polled)</th>
         <th class="num">Deals</th><th class="num">Won</th><th class="num">Won value</th>
         <th class="num">Calls</th><th class="num">Talk time</th><th class="num">Meetings</th>
         <th class="num">Tasks</th><th class="num">Online acts</th></tr></thead>

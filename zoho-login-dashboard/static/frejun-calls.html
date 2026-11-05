@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreJun Call Intelligence</title>
+<meta name="description" content="Live FreJun call-log dashboard for Lucira: volume, connect rate, talk time, agent productivity, missed-call follow-up and Zoho deal speed-to-call.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Josefin+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Lucira brand chrome (Brand Guidelines): Taupe #A68380, Cream #F2DFCE, Blush #F2DCE0, Rose #D9A7B4, Rose Gold #B76E79 */
+  --brand-taupe:#A68380; --brand-cream:#F2DFCE; --brand-blush:#F2DCE0; --brand-rose:#D9A7B4; --brand-rosegold:#B76E79;
+  --serif:"Josefin Sans","Futura","Jost",system-ui,sans-serif;
+  --sans:"Futura","Jost",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --r:14px;
+}
+/* Data marks use the validated dataviz reference palette (slots 1-3 all-pairs CVD-safe) + neutral "Other". */
+html[data-theme=light]{
+  --bg:#F6ECE6; --surface:#FFFCFA; --surface-2:#FBF3EF; --surface-3:#F2E3DC; --hair:rgba(80,50,48,.11);
+  --ink:#3A2B2C; --ink-2:#6B5754; --muted:#8F7C78; --accent:#8E6763; --accent-soft:rgba(166,131,128,.15);
+  --grid:rgba(80,50,48,.08); --axis:rgba(80,50,48,.25); --shadow:0 14px 36px -22px rgba(110,70,66,.28);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#a8a29e; --s5:#eda100;
+  --seq0:#f0efec; --seq1:#cde2fb; --seq2:#9ec5f4; --seq3:#6da7ec; --seq4:#3987e5; --seq5:#1c5cab; --seq6:#0d366b;
+  --good:#0ca30c; --warn:#b07800; --crit:#d03b3b;
+}
+html[data-theme=dark]{
+  --bg:#1E1718; --surface:#2B2223; --surface-2:#33292A; --surface-3:#3D3233; --hair:rgba(242,223,206,.10);
+  --ink:#F7EDE4; --ink-2:#CDB9B2; --muted:#A3908B; --accent:#D9A7B4; --accent-soft:rgba(217,167,180,.15);
+  --grid:rgba(255,255,255,.06); --axis:rgba(255,255,255,.16); --shadow:0 14px 36px -22px rgba(0,0,0,.7);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#77716c; --s5:#c98500;
+  --seq0:#383835; --seq1:#104281; --seq2:#184f95; --seq3:#1c5cab; --seq4:#2a78d6; --seq5:#5598e7; --seq6:#9ec5f4;
+  --good:#3fbf3f; --warn:#fab219; --crit:#e66767;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:.2px}
+button,select,input{font-family:inherit;font-size:13px;color:inherit}
+.top{background:var(--brand-taupe);color:#FFF8F0;padding:14px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.top .mark{width:38px;height:38px;border-radius:50%/42%;background:var(--brand-cream);color:#7A5754;display:grid;place-items:center;font-family:var(--serif);font-weight:700;font-size:20px}
+.top h1{font-size:19px;letter-spacing:2px;text-transform:uppercase}
+.top .sub{font-size:11px;letter-spacing:1.5px;opacity:.85;text-transform:uppercase}
+.top .sp{flex:1}
+.top .fresh{font-size:12px;background:rgba(255,248,240,.16);padding:6px 10px;border-radius:999px;display:flex;gap:8px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;background:#7CFC9A;display:inline-block}
+.dot.stale{background:#ffcf5a}.dot.dead{background:#ff8a8a}
+.top button{background:rgba(255,248,240,.18);border:1px solid rgba(255,248,240,.35);color:#FFF8F0;border-radius:8px;padding:6px 10px;cursor:pointer}
+.top button:hover{background:rgba(255,248,240,.3)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 22px;background:var(--surface);border-bottom:1px solid var(--hair);position:relative;z-index:2}
+.seg{display:inline-flex;border:1px solid var(--hair);border-radius:9px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:6px 11px;cursor:pointer;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--hair)}
+.seg button.on{background:var(--accent);color:var(--surface)}
+.filters select,.filters input{background:var(--surface-2);border:1px solid var(--hair);border-radius:8px;padding:6px 8px}
+.filters label{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.tabs{display:flex;gap:4px;padding:10px 22px 0;flex-wrap:wrap}
+.tab{padding:8px 14px;border-radius:10px 10px 0 0;cursor:pointer;color:var(--ink-2);border:1px solid transparent;border-bottom:0;font-weight:500}
+.tab.on{background:var(--surface);border-color:var(--hair);color:var(--accent);font-weight:600}
+main{padding:0 22px 40px}
+.view{display:none}.view.on{display:block}
+.panel{background:var(--surface);border:1px solid var(--hair);border-radius:0 var(--r) var(--r) var(--r);padding:18px;box-shadow:var(--shadow)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface-2);border:1px solid var(--hair);border-radius:12px;padding:12px 14px}
+.kpi .l{font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.kpi .v{font-family:var(--serif);font-size:26px;font-weight:600;margin-top:4px}
+.kpi .h{font-size:12px;color:var(--ink-2);margin-top:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:980px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:14px 16px;margin-bottom:16px;min-width:0}
+.card h3{font-size:15px;margin-bottom:2px}
+.card .hint{font-size:12px;color:var(--muted);margin-bottom:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin:4px 0 8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+svg text{fill:var(--muted);font-size:11px;font-family:var(--sans)}
+.tablewrap{overflow:auto;max-height:560px;border:1px solid var(--hair);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--hair);white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface-2);font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);cursor:pointer;-webkit-user-select:none;user-select:none;z-index:1}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+th[data-dir=asc]::after{content:" ▲"}th[data-dir=desc]::after{content:" ▼"}
+tbody tr:hover td{background:var(--accent-soft)}
+tr.total td{font-weight:600;background:var(--surface-2)}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600}
+.pill.conn{background:color-mix(in srgb,var(--s1) 16%,transparent);color:var(--ink)}
+.pill.na{background:color-mix(in srgb,var(--s2) 18%,transparent);color:var(--ink)}
+.pill.nav{background:color-mix(in srgb,var(--s3) 18%,transparent);color:var(--ink)}
+.pill.sa{background:color-mix(in srgb,var(--s5) 22%,transparent);color:var(--ink)}
+.pill.oth{background:var(--surface-3);color:var(--ink-2)}
+.ins{list-style:none;display:grid;gap:8px}
+.ins li{padding:9px 12px;border-left:3px solid var(--brand-taupe);background:var(--surface-2);border-radius:0 8px 8px 0;font-size:13px;color:var(--ink-2)}
+.ins b{color:var(--ink)}
+.bar{height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--s1);border-radius:4px}
+.btn{background:var(--surface-2);border:1px solid var(--hair);border-radius:8px;padding:5px 10px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.muted{color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+#tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--hair);box-shadow:var(--shadow);border-radius:8px;padding:8px 10px;font-size:12px;z-index:50;display:none;max-width:280px}
+#tip b{font-weight:600}
+#tip .r{display:flex;gap:8px;align-items:center;justify-content:space-between}
+#tip i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+#loading{padding:80px;text-align:center;color:var(--muted)}
+.hm td{padding:0;border:2px solid var(--surface);text-align:center;font-size:11px;min-width:30px;height:26px;color:var(--ink)}
+.hm th{position:static;background:none;cursor:default;padding:2px 4px;text-align:center}
+.err{color:var(--crit);padding:30px}
+.fbar{display:none;margin:10px 0 0;padding:9px 14px;border-radius:10px;background:color-mix(in srgb,var(--s5) 18%,var(--surface));border:1px solid color-mix(in srgb,var(--s5) 55%,transparent);font-size:13px;align-items:center;gap:10px;flex-wrap:wrap}
+.fbar.on{display:flex}
+.filters select.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);font-weight:600}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="mark">L</div>
+  <div><h1>FreJun Call Intelligence</h1><div class="sub">Lucira · live call log · all times IST</div></div>
+  <div class="sp"></div>
+  <div class="fresh" id="fresh"><span class="dot"></span><span>loading…</span></div>
+  <button id="refreshBtn" title="Fetch latest from BigQuery">↻ Refresh</button>
+  <button id="themeBtn" title="Toggle theme">◐</button>
+</div>
+
+<div class="filters">
+  <div class="seg" id="rangeSeg">
+    <button data-r="today">Today</button><button data-r="yday">Yesterday</button><button data-r="7" class="on">7 days</button><button data-r="30">30 days</button><button data-r="all">All</button>
+  </div>
+  <label>From <input type="date" id="dFrom"></label>
+  <label>To <input type="date" id="dTo"></label>
+  <label>Team <select id="fTeam"><option value="">All</option><option value="central">Central team</option><option value="store">Store accounts</option></select></label>
+  <label>Agent <select id="fAgent"><option value="">All agents</option></select></label>
+  <label>Direction <select id="fDir"><option value="">All</option><option value="0">Outgoing</option><option value="1">Incoming</option></select></label>
+</div>
+
+<div class="tabs" id="tabs">
+  <div class="tab on" data-v="ov">Overview</div>
+  <div class="tab" data-v="ag">Agents</div>
+  <div class="tab" data-v="fu">Follow-up</div>
+  <div class="tab" data-v="zd">Zoho Deals</div>
+  <div class="tab" data-v="log">Call Log</div>
+  <div class="tab" data-v="logic">Logic</div>
+</div>
+<main>
+  <div class="fbar" id="fbar"></div>
+  <div id="loading">Loading FreJun calls…</div>
+  <div class="panel view" id="v-ov"></div>
+  <div class="panel view" id="v-ag"></div>
+  <div class="panel view" id="v-fu"></div>
+  <div class="panel view" id="v-zd"></div>
+  <div class="panel view" id="v-log"></div>
+  <div class="panel view" id="v-logic"></div>
+</main>
+<div id="tip"></div>
+
+<script>
+'use strict';
+const IST = 19800;                           // seconds east of UTC
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtInt = n => Math.round(n || 0).toLocaleString('en-IN');
+const pct = (a, b) => b ? (100 * a / b) : 0;
+const fmtPct = (a, b) => b ? pct(a, b).toFixed(1) + '%' : '—';
+// All durations are shown as HH:MM:SS (hours keep counting past 24, e.g. 28:30:12).
+const p2 = n => String(n).padStart(2, '0');
+const hms = s => { s = Math.max(0, Math.round(s || 0)); return p2(Math.floor(s / 3600)) + ':' + p2(Math.floor(s % 3600 / 60)) + ':' + p2(s % 60); };
+const fmtDur = hms, fmtHrs = hms;
+const fmtLag = s => s == null ? '—' : hms(s);
+const dayKey = t => new Date((t + IST) * 1000).toISOString().slice(0, 10);
+const fmtTime = t => { const d = new Date((t + IST) * 1000); return d.toISOString().slice(0, 10) + ' ' + d.toISOString().slice(11, 19); };
+const hhmm = secOfDay => String(Math.floor(secOfDay / 3600)).padStart(2, '0') + ':' + String(Math.floor(secOfDay % 3600 / 60)).padStart(2, '0');
+const median = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// CONNECTED RULE: a call counts as connected only if FreJun says "answered" AND the
+// customer stayed on the line for MORE than CONNECT_MIN_S seconds of talk time.
+// Everything else (incl. answered calls of <=30 s) is NOT connected. See the Logic tab.
+const CONNECT_MIN_S = 30;
+// Outcome buckets — fixed order. Only 'conn' is "connected"; the other four are all "not connected".
+const OUT = [
+  {k:'conn', label:'Connected (>' + CONNECT_MIN_S + 's)', v:'--s1'},
+  {k:'na',   label:'Not answered',                        v:'--s2'},
+  {k:'nav',  label:'Unavailable / busy',                  v:'--s3'},
+  {k:'sa',   label:'Answered ≤' + CONNECT_MIN_S + 's',    v:'--s5'},
+  {k:'oth',  label:'Other',                               v:'--s4'},
+];
+const OUT_LABEL = Object.fromEntries(OUT.map(o => [o.k, o.label]));
+const bucketOf = (s, talk) => s === 'answered' ? (talk > CONNECT_MIN_S ? 'conn' : 'sa') : (s === 'not-answered' || s === 'user-not-answered') ? 'na' : (s === 'not_available' || s === 'user-busy') ? 'nav' : 'oth';
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+let RAW = null, CALLS = [], AGENTS = [], DEALS = [], BYPHONE = new Map(), DEALS_BY_PHONE = new Map();
+const ST = { from: null, to: null, team: '', agent: '', dir: '', view: 'ov', logQ: '', logOut: '' };
+
+// ── data load ───────────────────────────────────────────────────────────────
+async function load(force) {
+  $('fresh').innerHTML = '<span class="dot stale"></span><span>loading…</span>';
+  try {
+    const r = await fetch('/api/frejun-calls' + (force ? '?refresh=1' : ''), {cache: 'no-store'});
+    const j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || r.status);
+    RAW = j; prep();
+    $('loading').style.display = 'none';
+    if (!ST.from) setRange('7');
+    render();
+  } catch (e) {
+    $('loading').innerHTML = '<div class="err">Could not load FreJun data: ' + esc(e.message) + '</div>';
+    $('fresh').innerHTML = '<span class="dot dead"></span><span>load failed</span>';
+  }
+}
+
+function prep() {
+  AGENTS = RAW.agents.map(a => ({...a, team: /^lc[a-z]{2,}/.test(a.email.split('@')[0]) && /store|vihar/i.test(a.name) ? 'store' : 'central'}));
+  CALLS = RAW.calls.map(r => {
+    const t = r[0], lt = t + IST, d = new Date(lt * 1000);
+    return { t, a: r[1], st: RAW.statuses[r[2]], b: bucketOf(RAW.statuses[r[2]], r[4]), inc: r[3], talk: r[4], span: r[5],
+             phone: r[6], name: r[7], outcome: r[8], notes: r[9], rec: r[10], id: r[11],
+             day: d.toISOString().slice(0, 10), hr: d.getUTCHours(), dow: (d.getUTCDay() + 6) % 7, sod: lt % 86400 };
+  });
+  BYPHONE = new Map();
+  for (const c of CALLS) { if (!c.phone) continue; (BYPHONE.get(c.phone) || BYPHONE.set(c.phone, []).get(c.phone)).push(c); }
+  DEALS = RAW.deals.map(d => ({id: d[0], created: d[1], owner: d[2], stage: d[3], source: d[4], name: d[5], phone: d[6]}));
+  DEALS_BY_PHONE = new Map();
+  for (const d of DEALS) (DEALS_BY_PHONE.get(d.phone) || DEALS_BY_PHONE.set(d.phone, []).get(d.phone)).push(d);
+  for (const l of DEALS_BY_PHONE.values()) l.sort((x, y) => x.created - y.created);
+  // Each call → the latest Zoho deal on that mobile created before the call (else the earliest one after).
+  for (const c of CALLS) {
+    const l = DEALS_BY_PHONE.get(c.phone); if (!l) { c.deal = null; continue; }
+    let pick = null; for (const d of l) { if (d.created <= c.t) pick = d; }
+    c.deal = pick || l[0];
+  }
+  const sel = $('fAgent'), cur = sel.value;
+  sel.innerHTML = '<option value="">All agents</option>' + AGENTS.map((a, i) => ({a, i})).sort((x, y) => x.a.name.localeCompare(y.a.name))
+    .map(({a, i}) => `<option value="${i}">${esc(a.name)}${a.team === 'store' ? ' (store)' : ''}</option>`).join('');
+  sel.value = cur;
+  const m = RAW.meta, ageMin = m.latest_call ? (Date.now() / 1000 - m.latest_call) / 60 : 1e9;
+  const cls = ageMin < 75 ? '' : ageMin < 24 * 60 ? 'stale' : 'dead';
+  $('fresh').innerHTML = `<span class="dot ${cls}"></span><span>Latest call ${m.latest_call ? fmtTime(Math.floor(m.latest_call)) : '—'} · ${fmtInt(m.rows)} calls · syncs every 30 min</span>`;
+}
+
+// ── filters ─────────────────────────────────────────────────────────────────
+function todayIST() { return dayKey(Math.floor(Date.now() / 1000)); }
+function addDays(k, n) { const d = new Date(k + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function setRange(r) {
+  const t = todayIST(), first = CALLS.length ? CALLS[0].day : t;
+  if (r === 'today') { ST.from = ST.to = t; }
+  else if (r === 'yday') { ST.from = ST.to = addDays(t, -1); }
+  else if (r === 'all') { ST.from = first; ST.to = t; }
+  else { ST.from = addDays(t, -(+r - 1)); ST.to = t; }
+  if (ST.from < first) ST.from = first;
+  $('dFrom').value = ST.from; $('dTo').value = ST.to;
+  document.querySelectorAll('#rangeSeg button').forEach(b => b.classList.toggle('on', b.dataset.r === r));
+}
+const agentOk = c => (ST.agent === '' || c.a === +ST.agent) && (ST.team === '' || AGENTS[c.a].team === ST.team);
+const inRange = day => day >= ST.from && day <= ST.to;
+function filtered() { return CALLS.filter(c => inRange(c.day) && agentOk(c) && (ST.dir === '' || c.inc === +ST.dir)); }
+function ownerOk(owner) {
+  if (ST.agent !== '') return AGENTS[+ST.agent].name.toLowerCase() === (owner || '').toLowerCase();
+  if (ST.team !== '') { const a = AGENTS.find(x => x.name.toLowerCase() === (owner || '').toLowerCase()); return a ? a.team === ST.team : ST.team === 'central'; }
+  return true;
+}
+
+// ── shared bits ─────────────────────────────────────────────────────────────
+function summarize(list) {
+  const s = {n: list.length, conn: 0, na: 0, nav: 0, sa: 0, oth: 0, talk: 0, talkAll: 0, phones: new Set(), reached: new Set(), inc: 0, out: 0};
+  for (const c of list) { s[c.b]++; s.talk += c.b === 'conn' ? c.talk : 0; s.talkAll += c.st === 'answered' ? c.talk : 0; if (c.phone) { s.phones.add(c.phone); if (c.b === 'conn') s.reached.add(c.phone); } c.inc ? s.inc++ : s.out++; }
+  return s;
+}
+const legendHTML = () => '<div class="legend">' + OUT.map(o => `<span><i style="background:var(${o.v})"></i>${o.label}</span>`).join('') + '</div>';
+const tip = $('tip');
+function showTip(e, html) { tip.innerHTML = html; tip.style.display = 'block'; const w = tip.offsetWidth, h = tip.offsetHeight; let x = e.clientX + 14, y = e.clientY + 14; if (x + w > innerWidth - 8) x = e.clientX - w - 14; if (y + h > innerHeight - 8) y = e.clientY - h - 14; tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+function hideTip() { tip.style.display = 'none'; }
+function bindTips(root) {
+  root.querySelectorAll('[data-tip]').forEach(el => { el.addEventListener('mousemove', e => showTip(e, el.dataset.tip)); el.addEventListener('mouseleave', hideTip); });
+}
+function tipRows(title, rows) { return `<b>${esc(title)}</b>` + rows.map(([c, l, v]) => `<div class="r"><span>${c ? `<i style="background:var(${c})"></i>` : ''}${esc(l)}</span><b>${esc(v)}</b></div>`).join(''); }
+
+// Stacked vertical bars by day. rows: [{key,label,parts:{conn,na,nav,oth}}]
+function stackedBars(rows, h = 220) {
+  if (!rows.length) return '<div class="muted">No calls in range.</div>';
+  const W = Math.max(rows.length * 28, 560), padL = 40, padB = 26, padT = 10, iw = W - padL - 8, ih = h - padB - padT;
+  const max = Math.max(1, ...rows.map(r => OUT.reduce((s, o) => s + r.parts[o.k], 0)));
+  const nice = Math.pow(10, Math.floor(Math.log10(max))), top = Math.ceil(max / nice) * nice;
+  const bw = Math.min(26, iw / rows.length - 4), step = iw / rows.length;
+  let g = '';
+  for (let i = 0; i <= 4; i++) { const y = padT + ih - ih * i / 4; g += `<line x1="${padL}" x2="${W - 8}" y1="${y}" y2="${y}" stroke="var(--grid)"/><text x="${padL - 6}" y="${y + 4}" text-anchor="end">${fmtInt(top * i / 4)}</text>`; }
+  const every = Math.ceil(rows.length / 14);
+  rows.forEach((r, i) => {
+    const x = padL + i * step + (step - bw) / 2; let y = padT + ih; const tot = OUT.reduce((s, o) => s + r.parts[o.k], 0);
+    OUT.forEach((o, j) => {
+      const v = r.parts[o.k]; if (!v) return; const hh = ih * v / top; y -= hh;
+      const isTop = OUT.slice(j + 1).every(q => !r.parts[q.k]);
+      g += `<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(hh - 2, 1)}" rx="${isTop ? 3 : 0}" fill="var(${o.v})"/>`;
+    });
+    const t = tipRows(r.label, [...OUT.map(o => [o.v, o.label, fmtInt(r.parts[o.k])]), ['', 'Total', fmtInt(tot)], ['', 'Connect rate', fmtPct(r.parts.conn, tot)]]);
+    g += `<rect x="${padL + i * step}" y="${padT}" width="${step}" height="${ih}" fill="transparent" data-tip="${esc(t)}"/>`;
+    if (i % every === 0) g += `<text x="${x + bw / 2}" y="${h - 8}" text-anchor="middle">${esc(r.short)}</text>`;
+  });
+  g += `<line x1="${padL}" x2="${W - 8}" y1="${padT + ih}" y2="${padT + ih}" stroke="var(--axis)"/>`;
+  return `<div style="overflow-x:auto"><svg width="${W}" height="${h}" viewBox="0 0 ${W} ${h}" role="img">${g}</svg></div>`;
+}
+
+// Horizontal stacked bars (one per agent / stage).
+function hStacked(rows) {
+  if (!rows.length) return '<div class="muted">No data.</div>';
+  const max = Math.max(1, ...rows.map(r => r.total));
+  return '<div style="display:grid;grid-template-columns:minmax(120px,190px) 1fr 70px;gap:6px 10px;align-items:center">' + rows.map(r => {
+    const segs = OUT.map(o => r.parts[o.k] ? `<i style="display:block;height:100%;width:${100 * r.parts[o.k] / max}%;background:var(${o.v});margin-right:2px"></i>` : '').join('');
+    const t = tipRows(r.label, [...OUT.map(o => [o.v, o.label, fmtInt(r.parts[o.k])]), ['', 'Connect rate', fmtPct(r.parts.conn, r.total)]]);
+    return `<div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.label)}">${esc(r.label)}</div>
+      <div data-tip="${esc(t)}" style="display:flex;height:14px;border-radius:0 4px 4px 0;overflow:hidden">${segs}</div>
+      <div class="num" style="font-size:12px;text-align:right">${fmtInt(r.total)}</div>`;
+  }).join('') + '</div>';
+}
+
+// Sortable table. cols: [{k,label,num,fmt}], rows: objects. opts.total: object for footer.
+function table(id, cols, rows, opts = {}) {
+  const sk = opts.sort || cols.find(c => c.num)?.k, dir = opts.dir || 'desc';
+  const th = cols.map(c => `<th class="${c.num ? 'num' : ''}" data-k="${c.k}" ${c.k === sk ? `data-dir="${dir}"` : ''}>${esc(c.label)}</th>`).join('');
+  const lim = opts.limit || 1e9;
+  const body = sortRows(rows, cols, sk, dir).slice(0, lim).map(r => '<tr>' + cols.map(c => `<td class="${c.num ? 'num' : ''}">${c.html ? c.html(r) : esc(c.fmt ? c.fmt(r[c.k], r) : r[c.k])}</td>`).join('') + '</tr>').join('');
+  const tot = opts.total ? '<tr class="total">' + cols.map(c => `<td class="${c.num ? 'num' : ''}">${esc(opts.total[c.k] != null ? (c.fmt ? c.fmt(opts.total[c.k], opts.total) : opts.total[c.k]) : '')}</td>`).join('') + '</tr>' : '';
+  TABLES[id] = {cols, rows, opts};
+  return `<div class="tablewrap" id="${id}"><table><thead><tr>${th}</tr></thead><tbody>${body}${tot}</tbody></table></div>`;
+}
+const TABLES = {};
+function sortRows(rows, cols, k, dir) {
+  const c = cols.find(x => x.k === k); const sv = c && c.sv ? c.sv : (r => r[k]);
+  return [...rows].sort((a, b) => { const x = sv(a), y = sv(b); const r = (x == null) - (y == null) || (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))); return dir === 'asc' ? r : -r; });
+}
+document.addEventListener('click', e => {
+  const th = e.target.closest('th[data-k]'); if (!th) return;
+  const wrap = th.closest('.tablewrap'); const T = TABLES[wrap?.id]; if (!T) return;
+  const dir = th.dataset.dir === 'desc' ? 'asc' : 'desc';
+  wrap.outerHTML = table(wrap.id, T.cols, T.rows, {...T.opts, sort: th.dataset.k, dir});
+  bindTips(document);
+});
+function csv(name, cols, rows) {
+  const q = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const txt = [cols.map(c => q(c.label)).join(','), ...rows.map(r => cols.map(c => q(c.csv ? c.csv(r) : c.fmt ? c.fmt(r[c.k], r) : r[c.k])).join(','))].join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + txt], {type: 'text/csv'})); a.download = name; a.click();
+}
+const card = (title, hint, body, extra = '') => `<div class="card">${extra}<h3>${esc(title)}</h3>${hint ? `<div class="hint">${hint}</div>` : ''}${body}</div>`;
+const kpi = (l, v, h) => `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${v}</div><div class="h">${h || ''}</div></div>`;
+
+// ── Overview ────────────────────────────────────────────────────────────────
+function renderOverview(F) {
+  const s = summarize(F);
+  const outs = F.filter(c => !c.inc), so = summarize(outs);
+  const missed = F.filter(c => c.inc && c.b !== 'conn');
+  const conCalls = F.filter(c => c.b === 'conn');
+  const days = new Map(); for (const c of F) { const d = days.get(c.day) || {conn: 0, na: 0, nav: 0, sa: 0, oth: 0}; d[c.b]++; days.set(c.day, d); }
+  const dayRows = []; for (let k = ST.from; k <= ST.to; k = addDays(k, 1)) { const p = days.get(k) || {conn: 0, na: 0, nav: 0, sa: 0, oth: 0}; const dd = new Date(k + 'T00:00:00Z'); dayRows.push({label: k + ' (' + DOW[(dd.getUTCDay() + 6) % 7] + ')', short: k.slice(8) + '/' + k.slice(5, 7), parts: p}); }
+  // Hourly bars when a single day is selected, else daily.
+  let trend;
+  if (ST.from === ST.to) {
+    const hrs = Array.from({length: 24}, (_, h) => ({label: hhmm(h * 3600) + '–' + hhmm(h * 3600 + 3599), short: String(h).padStart(2, '0'), parts: {conn: 0, na: 0, nav: 0, sa: 0, oth: 0}}));
+    for (const c of F) hrs[c.hr].parts[c.b]++;
+    const first = hrs.findIndex(h => OUT.some(o => h.parts[o.k])), last = 23 - [...hrs].reverse().findIndex(h => OUT.some(o => h.parts[o.k]));
+    trend = card('Calls by hour — ' + ST.from, 'Stacked by outcome. Hover a bar for the split.', legendHTML() + stackedBars(first < 0 ? [] : hrs.slice(Math.min(first, 9), Math.max(last, 20) + 1)));
+  } else trend = card('Calls per day', 'Stacked by outcome. Hover a day for the split and connect rate.', legendHTML() + stackedBars(dayRows));
+
+  // Day-of-week × hour heatmap of connect rate (cells with <5 calls left blank).
+  const cell = Array.from({length: 7}, () => Array.from({length: 24}, () => ({n: 0, c: 0})));
+  for (const c of F) { if (c.inc) continue; const x = cell[c.dow][c.hr]; x.n++; if (c.b === 'conn') x.c++; }
+  const hrsUsed = []; for (let h = 0; h < 24; h++) if (cell.some(r => r[h].n >= 5)) hrsUsed.push(h);
+  const seq = ['--seq1', '--seq2', '--seq3', '--seq4', '--seq5', '--seq6'];
+  const rates = cell.flat().filter(x => x.n >= 5).map(x => x.c / x.n), rmin = Math.min(...rates), rmax = Math.max(...rates);
+  const hm = hrsUsed.length ? `<div style="overflow-x:auto"><table class="hm"><tr><th></th>${hrsUsed.map(h => `<th>${String(h).padStart(2, '0')}</th>`).join('')}</tr>` +
+    cell.map((r, d) => `<tr><th style="text-align:right">${DOW[d]}</th>` + hrsUsed.map(h => {
+      const x = r[h]; if (x.n < 5) return `<td style="background:var(--seq0)" data-tip="${esc(`<b>${DOW[d]} ${hhmm(h * 3600)}</b><div>${x.n} outgoing calls (too few to rate)</div>`)}"></td>`;
+      const v = x.c / x.n, i = rmax > rmin ? Math.min(5, Math.floor((v - rmin) / (rmax - rmin) * 6)) : 3;
+      return `<td style="background:var(${seq[i]});color:${i >= 3 ? '#fff' : 'var(--ink)'}" data-tip="${esc(tipRows(DOW[d] + ' ' + hhmm(h * 3600) + '–' + hhmm(h * 3600 + 3599), [['', 'Outgoing calls', fmtInt(x.n)], ['', 'Connected', fmtInt(x.c)], ['', 'Connect rate', fmtPct(x.c, x.n)]]))}">${Math.round(100 * v)}</td>`;
+    }).join('') + '</tr>').join('') + `</table></div><div class="legend" style="margin-top:8px"><span>Connect rate (%) — lighter = lower</span>${seq.map(v => `<i style="background:var(${v});margin:0"></i>`).join('')}<span>${rates.length ? Math.round(100 * rmin) + '% → ' + Math.round(100 * rmax) + '%' : ''}</span></div>` : '<div class="muted">Not enough outgoing calls.</div>';
+
+  // Best / worst hour (outgoing, ≥30 calls) for an insight.
+  const hourAgg = Array.from({length: 24}, () => ({n: 0, c: 0})); for (const c of outs) { hourAgg[c.hr].n++; if (c.b === 'conn') hourAgg[c.hr].c++; }
+  const rated = hourAgg.map((x, h) => ({h, ...x, r: x.n ? x.c / x.n : 0})).filter(x => x.n >= 30).sort((a, b) => b.r - a.r);
+  const busiest = hourAgg.map((x, h) => ({h, ...x})).sort((a, b) => b.n - a.n)[0];
+  const ins = [];
+  ins.push(`<b>${fmtPct(so.conn, so.n)}</b> of ${fmtInt(so.n)} outgoing calls connected for more than ${CONNECT_MIN_S} s; <b>${fmtInt(so.na)}</b> rang out unanswered, <b>${fmtInt(so.nav)}</b> hit unavailable / busy and <b>${fmtInt(so.sa)}</b> were picked up but lasted ${CONNECT_MIN_S} s or less.`);
+  ins.push(`<b>${fmtInt(s.reached.size)}</b> of ${fmtInt(s.phones.size)} unique numbers (<b>${fmtPct(s.reached.size, s.phones.size)}</b>) were reached at least once — on average <b>${(s.n / Math.max(1, s.phones.size)).toFixed(1)}</b> calls per number.`);
+  if (rated.length > 1) ins.push(`Best hour to dial: <b>${hhmm(rated[0].h * 3600)}</b> (${fmtPct(rated[0].c, rated[0].n)} connect) vs worst <b>${hhmm(rated[rated.length - 1].h * 3600)}</b> (${fmtPct(rated[rated.length - 1].c, rated[rated.length - 1].n)}). Busiest hour is <b>${hhmm(busiest.h * 3600)}</b> with ${fmtInt(busiest.n)} dials.`);
+  if (s.sa) ins.push(`<b>${fmtInt(s.sa)}</b> of ${fmtInt(s.conn + s.sa)} answered calls (<b>${fmtPct(s.sa, s.conn + s.sa)}</b>) ended within ${CONNECT_MIN_S} s — counted as <b>not connected</b> (quick hang-ups, wrong numbers, “call later”).`);
+  if (s.inc) ins.push(`<b>${fmtInt(s.inc)}</b> incoming calls, of which <b>${fmtInt(missed.length)}</b> were missed — see the Follow-up tab for who still needs a call back.`);
+
+  $('v-ov').innerHTML = `<div class="kpis">
+    ${kpi('Total calls', fmtInt(s.n), `${fmtInt(s.out)} out · ${fmtInt(s.inc)} in`)}
+    ${kpi('Connected (>' + CONNECT_MIN_S + 's)', fmtInt(s.conn), fmtPct(s.conn, s.n) + ' connect rate')}
+    ${kpi('Not connected', fmtInt(s.n - s.conn), 'incl. ' + fmtInt(s.sa) + ' answered ≤' + CONNECT_MIN_S + 's')}
+    ${kpi('Talk time', fmtHrs(s.talkAll), 'HH:MM:SS · all answered · ' + fmtHrs(s.talk) + ' on connected')}
+    ${kpi('Avg talk / connect', fmtDur(s.conn ? s.talk / s.conn : 0), 'median ' + fmtDur(median(conCalls.map(c => c.talk)) || 0))}
+    ${kpi('Unique numbers', fmtInt(s.phones.size), fmtInt(s.reached.size) + ' reached (' + fmtPct(s.reached.size, s.phones.size) + ')')}
+    ${kpi('Missed incoming', fmtInt(missed.length), 'of ' + fmtInt(s.inc) + ' incoming')}
+  </div>
+  <div class="grid2"><div>${trend}</div><div>${card('Key insights', '', '<ul class="ins">' + ins.map(x => `<li>${x}</li>`).join('') + '</ul>')}</div></div>
+  ${card('When do calls connect? (outgoing, day × hour)', 'Each cell = connect rate for outgoing calls in that weekday-hour; blank cells had fewer than 5 calls. Hover for counts.', hm)}
+  ${card('Outcome by agent', 'Every agent, stacked by outcome. Hover for the split.', legendHTML() + hStacked(agentRows(F).sort((a, b) => b.total - a.total).map(r => ({label: r.name, parts: r, total: r.total}))))}`;
+}
+
+// ── Agents ──────────────────────────────────────────────────────────────────
+function agentRows(F) {
+  const m = new Map();
+  for (const c of F) {
+    let r = m.get(c.a);
+    if (!r) { const A = AGENTS[c.a]; r = {name: A.name, email: A.email, team: A.team === 'store' ? 'Store' : 'Central', total: 0, conn: 0, na: 0, nav: 0, sa: 0, oth: 0, inc: 0, talk: 0, ctalk: 0, phones: new Set(), reached: new Set(), days: new Map(), short: 0}; m.set(c.a, r); }
+    r.total++; r[c.b]++; if (c.inc) r.inc++;
+    if (c.st === 'answered') r.talk += c.talk;
+    if (c.b === 'sa') r.short++;
+    if (c.b === 'conn') { r.ctalk += c.talk; if (c.phone) r.reached.add(c.phone); }
+    if (c.phone) r.phones.add(c.phone);
+    const d = r.days.get(c.day) || {first: 1e9, last: -1}; d.first = Math.min(d.first, c.sod); d.last = Math.max(d.last, c.sod); r.days.set(c.day, d);
+  }
+  return [...m.values()].map(r => {
+    const ds = [...r.days.values()];
+    return {...r, rate: pct(r.conn, r.total), uniq: r.phones.size, reachedN: r.reached.size, active: ds.length,
+      perDay: r.total / Math.max(1, ds.length), avgTalk: r.conn ? r.ctalk / r.conn : 0,
+      first: ds.length ? ds.reduce((s, d) => s + d.first, 0) / ds.length : null, last: ds.length ? ds.reduce((s, d) => s + d.last, 0) / ds.length : null};
+  });
+}
+const AGENT_COLS = [
+  {k: 'name', label: 'Agent'}, {k: 'team', label: 'Team'},
+  {k: 'total', label: 'Calls', num: 1, fmt: fmtInt}, {k: 'conn', label: 'Connected >' + CONNECT_MIN_S + 's', num: 1, fmt: fmtInt},
+  {k: 'rate', label: 'Connect %', num: 1, fmt: v => v.toFixed(1) + '%'},
+  {k: 'talk', label: 'Talk time', num: 1, fmt: fmtDur}, {k: 'avgTalk', label: 'Avg talk / connect', num: 1, fmt: fmtDur},
+  {k: 'short', label: 'Answered ≤' + CONNECT_MIN_S + 's', num: 1, fmt: fmtInt},
+  {k: 'uniq', label: 'Unique nos.', num: 1, fmt: fmtInt}, {k: 'reachedN', label: 'Reached', num: 1, fmt: fmtInt},
+  {k: 'active', label: 'Active days', num: 1, fmt: fmtInt}, {k: 'perDay', label: 'Calls / day', num: 1, fmt: v => v.toFixed(0)},
+  {k: 'first', label: 'Avg first call', num: 1, fmt: v => v == null ? '—' : hms(v)}, {k: 'last', label: 'Avg last call', num: 1, fmt: v => v == null ? '—' : hms(v)},
+  {k: 'inc', label: 'Incoming', num: 1, fmt: fmtInt},
+];
+function renderAgents(F) {
+  const rows = agentRows(F), s = summarize(F);
+  const tot = {name: 'Total', team: '', total: s.n, conn: s.conn, rate: pct(s.conn, s.n), talk: s.talkAll, avgTalk: s.conn ? s.talk / s.conn : 0,
+    short: rows.reduce((a, r) => a + r.short, 0), uniq: s.phones.size, reachedN: s.reached.size, active: new Set(F.map(c => c.day)).size,
+    perDay: null, first: null, last: null, inc: s.inc};
+  const cols = AGENT_COLS.map(c => c.k === 'perDay' ? {...c, fmt: v => v == null ? '' : v.toFixed(0)} : c);
+  const ranked = rows.filter(r => r.total >= 50).sort((a, b) => b.rate - a.rate);
+  const ins = [];
+  if (ranked.length > 1) {
+    ins.push(`Highest connect rate: <b>${esc(ranked[0].name)}</b> at <b>${ranked[0].rate.toFixed(1)}%</b>; lowest: <b>${esc(ranked[ranked.length - 1].name)}</b> at <b>${ranked[ranked.length - 1].rate.toFixed(1)}%</b> (agents with 50+ calls).`);
+    const vol = [...rows].sort((a, b) => b.perDay - a.perDay)[0]; ins.push(`Most dials per active day: <b>${esc(vol.name)}</b> — <b>${vol.perDay.toFixed(0)}</b> calls/day.`);
+    const tk = [...rows].sort((a, b) => b.talk - a.talk)[0]; ins.push(`Most talk time: <b>${esc(tk.name)}</b> — <b>${fmtDur(tk.talk)}</b> across ${fmtInt(tk.conn + tk.short)} answered calls.`);
+  }
+  $('v-ag').innerHTML = card('Key insights', '', '<ul class="ins">' + ins.map(x => `<li>${x}</li>`).join('') + '</ul>') +
+    card('Agent productivity', `Click a column to sort. Store accounts are the shared store logins (e.g. Chembur Store). "Connected" = answered with more than ${CONNECT_MIN_S} s of talk. "Reached" = unique numbers with at least one connected call. Talk time counts every answered call. First/last call = average clock time across active days.`,
+      table('tAgents', cols, rows, {sort: 'total', total: tot}), `<button class="btn" style="float:right" id="csvAgents">⬇ CSV</button>`);
+  $('csvAgents').onclick = () => csv(`frejun_agents_${ST.from}_${ST.to}.csv`, AGENT_COLS, rows);
+}
+
+// ── Follow-up ───────────────────────────────────────────────────────────────
+function renderFollowup(F) {
+  // Missed incoming: incoming & not connected, with no later connected call (either direction) to that number.
+  const missed = F.filter(c => c.inc && c.b !== 'conn' && c.phone).map(c => {
+    const later = (BYPHONE.get(c.phone) || []).filter(x => x.t > c.t);
+    const back = later.find(x => !x.inc), conn = later.find(x => x.b === 'conn');
+    return {...c, agentName: AGENTS[c.a].name, attempts: later.filter(x => !x.inc).length, backAt: back ? back.t : null, lag: back ? back.t - c.t : null, resolved: !!conn, dealStage: c.deal?.stage || ''};
+  });
+  // Keep the latest missed call per number.
+  const byNum = new Map(); for (const m of missed) { const p = byNum.get(m.phone); if (!p || m.t > p.t) byNum.set(m.phone, m); }
+  const mrows = [...byNum.values()];
+  const open = mrows.filter(m => !m.resolved), notCalled = open.filter(m => m.backAt == null);
+  // Numbers dialled ≥3 times in range, never connected (ever, up to now).
+  const dial = new Map(); for (const c of F) { if (c.inc || !c.phone) continue; const d = dial.get(c.phone) || {phone: c.phone, n: 0, last: 0, agents: new Set(), name: ''}; d.n++; d.last = Math.max(d.last, c.t); d.agents.add(AGENTS[c.a].name); if (c.name) d.name = c.name; dial.set(c.phone, d); }
+  const never = [...dial.values()].filter(d => d.n >= 3 && !(BYPHONE.get(d.phone) || []).some(x => x.b === 'conn'))
+    .map(d => { const dl = (DEALS_BY_PHONE.get(d.phone) || []).slice(-1)[0]; return {...d, agentsS: [...d.agents].join(', '), stage: dl?.stage || '', owner: dl?.owner || ''}; });
+  // Attempts-to-first-connect distribution (numbers first dialled in range).
+  const att = {1: 0, 2: 0, 3: 0, '4-5': 0, '6+': 0, never: 0};
+  for (const [p, l] of BYPHONE) {
+    const outs = l.filter(x => !x.inc && agentOk(x)); if (!outs.length || !inRange(outs[0].day)) continue;
+    const i = outs.findIndex(x => x.b === 'conn'); const k = i < 0 ? 'never' : i === 0 ? 1 : i === 1 ? 2 : i === 2 ? 3 : i <= 4 ? '4-5' : '6+'; att[k]++;
+  }
+  const attTot = Object.values(att).reduce((a, b) => a + b, 0);
+  const attHTML = '<div style="display:grid;grid-template-columns:150px 1fr 110px;gap:6px 10px;align-items:center">' + Object.entries(att).map(([k, v]) =>
+    `<div style="font-size:12px">${k === 'never' ? 'Not connected yet' : k === '1' ? '1st attempt' : k + ' attempts'}</div><div class="bar" data-tip="${esc(`<b>${k === 'never' ? 'Not connected yet' : k + ' attempt(s)'}</b><div>${fmtInt(v)} numbers · ${fmtPct(v, attTot)}</div>`)}"><i style="width:${pct(v, attTot)}%;background:var(${k === 'never' ? '--s4' : '--s1'})"></i></div><div class="num" style="font-size:12px;text-align:right">${fmtInt(v)} · ${fmtPct(v, attTot)}</div>`).join('') + '</div>';
+
+  const MCOLS = [
+    {k: 't', label: 'Missed at', fmt: v => fmtTime(v)}, {k: 'phone', label: 'Number'}, {k: 'name', label: 'Name'},
+    {k: 'agentName', label: 'Line (agent)'}, {k: 'st', label: 'Status'},
+    {k: 'dealStage', label: 'Zoho stage'},
+    {k: 'backAt', label: 'First call-back', num: 1, fmt: v => v == null ? 'none' : fmtTime(v)},
+    {k: 'lag', label: 'Call-back after', num: 1, fmt: v => fmtLag(v)}, {k: 'attempts', label: 'Call-backs', num: 1, fmt: fmtInt},
+  ];
+  const NCOLS = [
+    {k: 'phone', label: 'Number'}, {k: 'name', label: 'Name'}, {k: 'n', label: 'Dials in range', num: 1, fmt: fmtInt},
+    {k: 'last', label: 'Last dial', num: 1, fmt: v => fmtTime(v)}, {k: 'agentsS', label: 'Dialled by'}, {k: 'stage', label: 'Zoho stage'}, {k: 'owner', label: 'Deal owner'},
+  ];
+  $('v-fu').innerHTML = `<div class="kpis">
+      ${kpi('Missed incoming numbers', fmtInt(mrows.length), 'unique callers in range')}
+      ${kpi('Still unresolved', fmtInt(open.length), 'no connected call since')}
+      ${kpi('Never called back', fmtInt(notCalled.length), 'no outgoing call at all')}
+      ${kpi('Median call-back time', fmtLag(median(mrows.filter(m => m.lag != null).map(m => m.lag))), 'missed → first outgoing')}
+      ${kpi('Dialled 3+, never reached', fmtInt(never.length), 'numbers')}
+    </div>
+    ${card('Missed incoming calls — still unresolved (' + fmtInt(open.length) + ')', 'Latest missed incoming call per number, where no call to/from that number has connected since. These customers called Lucira and nobody has spoken to them yet.',
+      table('tMissed', MCOLS, open, {sort: 't'}), `<button class="btn" style="float:right" id="csvMissed">⬇ CSV</button>`)}
+    <div class="grid2">
+      <div>${card('Attempts needed to first connect', 'Numbers first dialled in the selected range — how many outgoing attempts it took before the first connected call.', attHTML)}</div>
+      <div>${card('Dialled 3+ times, never reached (' + fmtInt(never.length) + ')', 'Consider WhatsApp / SMS or a different time slot for these.', table('tNever', NCOLS, never, {sort: 'n', limit: 500}), `<button class="btn" style="float:right" id="csvNever">⬇ CSV</button>`)}</div>
+    </div>`;
+  $('csvMissed').onclick = () => csv(`frejun_missed_unresolved_${ST.from}_${ST.to}.csv`, MCOLS, open);
+  $('csvNever').onclick = () => csv(`frejun_never_reached_${ST.from}_${ST.to}.csv`, NCOLS, never);
+}
+
+// ── Zoho Deals ──────────────────────────────────────────────────────────────
+function renderDeals(F) {
+  const withDeal = F.filter(c => c.deal);
+  const stageMap = new Map(); for (const c of withDeal) { const k = c.deal.stage || '(blank)'; const r = stageMap.get(k) || {label: k, conn: 0, na: 0, nav: 0, sa: 0, oth: 0, total: 0}; r[c.b]++; r.total++; stageMap.set(k, r); }
+  const stageRows = [...stageMap.values()].sort((a, b) => b.total - a.total).map(r => ({label: r.label, parts: r, total: r.total}));
+  // Speed to first FreJun call for deals created in range.
+  const firstDay = CALLS.length ? CALLS[0].day : ST.from;
+  const created = DEALS.filter(d => { const k = dayKey(d.created); return inRange(k) && k >= firstDay && ownerOk(d.owner); });
+  const seen = new Set(); const uniq = [];
+  for (const d of created.sort((a, b) => a.created - b.created)) { const key = d.phone + '|' + dayKey(d.created); if (seen.has(key)) continue; seen.add(key); uniq.push(d); }
+  const BK = [['< 00:05:00', 300], ['00:05:00 – 00:30:00', 1800], ['00:30:00 – 02:00:00', 7200], ['02:00:00 – 24:00:00', 86400], ['> 24:00:00', Infinity]];
+  const bk = Object.fromEntries([...BK.map(b => [b[0], 0]), ['No FreJun call yet', 0]]);
+  const own = new Map();
+  for (const d of uniq) {
+    const fc = (BYPHONE.get(d.phone) || []).find(x => !x.inc && x.t >= d.created - 60);
+    const conn = (BYPHONE.get(d.phone) || []).find(x => x.b === 'conn' && x.t >= d.created - 60);
+    d._lag = fc ? Math.max(0, fc.t - d.created) : null; d._conn = !!conn; d._caller = fc ? AGENTS[fc.a].name : '';
+    const b = d._lag == null ? 'No FreJun call yet' : BK.find(x => d._lag < x[1])[0]; bk[b]++;
+    const o = own.get(d.owner || '(none)') || {owner: d.owner || '(none)', deals: 0, called: 0, conn: 0, lags: [], within30: 0, won: 0}; o.deals++;
+    if (d._lag != null) { o.called++; o.lags.push(d._lag); if (d._lag < 1800) o.within30++; }
+    if (d._conn) o.conn++; if (d.stage === 'Closed Won') o.won++; own.set(o.owner, o);
+  }
+  const ownRows = [...own.values()].map(o => ({...o, calledPct: pct(o.called, o.deals), connPct: pct(o.conn, o.deals), med: median(o.lags), w30: pct(o.within30, o.deals)}));
+  const tot = uniq.length, called = uniq.filter(d => d._lag != null).length;
+  const bkHTML = '<div style="display:grid;grid-template-columns:170px 1fr 110px;gap:6px 10px;align-items:center">' + Object.entries(bk).map(([k, v]) =>
+    `<div style="font-size:12px">${k}</div><div class="bar" data-tip="${esc(`<b>${k}</b><div>${fmtInt(v)} deals · ${fmtPct(v, tot)}</div>`)}"><i style="width:${pct(v, tot)}%;background:var(${k.startsWith('No') ? '--s4' : '--s1'})"></i></div><div class="num" style="font-size:12px;text-align:right">${fmtInt(v)} · ${fmtPct(v, tot)}</div>`).join('') + '</div>';
+  const OCOLS = [
+    {k: 'owner', label: 'Deal owner'}, {k: 'deals', label: 'New deals', num: 1, fmt: fmtInt},
+    {k: 'called', label: 'Called on FreJun', num: 1, fmt: fmtInt}, {k: 'calledPct', label: 'Called %', num: 1, fmt: v => v.toFixed(1) + '%'},
+    {k: 'w30', label: 'Called < 00:30:00', num: 1, fmt: v => v.toFixed(1) + '%'},
+    {k: 'med', label: 'Median time to 1st call', num: 1, fmt: v => fmtLag(v)},
+    {k: 'conn', label: 'Reached', num: 1, fmt: fmtInt}, {k: 'connPct', label: 'Reached %', num: 1, fmt: v => v.toFixed(1) + '%'},
+    {k: 'won', label: 'Closed Won (now)', num: 1, fmt: fmtInt},
+  ];
+  const s = summarize(F), sd = summarize(withDeal);
+  $('v-zd').innerHTML = `<div class="kpis">
+      ${kpi('Calls to Zoho deal numbers', fmtInt(withDeal.length), fmtPct(withDeal.length, s.n) + ' of all calls')}
+      ${kpi('Connect rate on deal calls', fmtPct(sd.conn, sd.n), 'vs ' + fmtPct(s.conn, s.n) + ' overall')}
+      ${kpi('New deals in range', fmtInt(tot), 'unique mobile per day')}
+      ${kpi('Called on FreJun', fmtPct(called, tot), fmtInt(called) + ' deals')}
+      ${kpi('Median speed to 1st call', fmtLag(median(uniq.filter(d => d._lag != null).map(d => d._lag))), 'deal created → first dial')}
+    </div>
+    <div class="grid2">
+      <div>${card('Speed to first FreJun call — new deals', 'Time from Zoho deal creation to first dial. Zoho deals created in the selected range, matched to FreJun by mobile number (last 10 digits). Deals created after hours naturally wait until the next morning.', bkHTML)}</div>
+      <div>${card('Call outcome by current deal stage', 'Calls to numbers that have a Zoho deal, grouped by that deal’s current stage.', legendHTML() + hStacked(stageRows))}</div>
+    </div>
+    ${card('Speed to call by deal owner', 'New deals per Zoho deal owner. "Reached" = at least one connected FreJun call after the deal was created. Agent filter matches the owner by name.', table('tOwners', OCOLS, ownRows, {sort: 'deals'}), `<button class="btn" style="float:right" id="csvOwners">⬇ CSV</button>`)}
+    <div class="note">Matching is by mobile number, so a deal also called from a different dialer (Zoho phone, personal mobile) shows here as "No FreJun call yet". FreJun history starts ${esc(firstDay)}; deals before that are excluded from speed-to-call.</div>`;
+  $('csvOwners').onclick = () => csv(`frejun_deal_owner_speed_${ST.from}_${ST.to}.csv`, OCOLS, ownRows);
+}
+
+// ── Call Log ────────────────────────────────────────────────────────────────
+const LOG_COLS = [
+  {k: 't', label: 'Time (IST)', fmt: v => fmtTime(v)},
+  {k: 'agentName', label: 'Agent'}, {k: 'dirS', label: 'Dir'},
+  {k: 'res', label: 'Result', html: r => `<span class="pill ${r.b}">${esc(r.res)}</span>`, csv: r => r.res},
+  {k: 'st', label: 'FreJun status'},
+  {k: 'talk', label: 'Talk', num: 1, fmt: v => fmtDur(v)}, {k: 'span', label: 'Ring + talk', num: 1, fmt: v => fmtDur(v)},
+  {k: 'phone', label: 'Number'}, {k: 'name', label: 'Name'}, {k: 'stage', label: 'Zoho stage'}, {k: 'owner', label: 'Deal owner'},
+  {k: 'outcome', label: 'Outcome'}, {k: 'notes', label: 'Notes', fmt: v => (v || '').slice(0, 80)},
+  {k: 'rec', label: 'Recording', html: r => r.rec ? `<button class="btn" data-rec="${esc(r.id)}">▶ Open</button>` : '', csv: r => r.id},
+];
+function renderLog(F) {
+  const q = ST.logQ.trim().toLowerCase(), qd = q.replace(/\D/g, '');
+  let rows = F.filter(c => (!ST.logOut || c.b === ST.logOut) && (!q || (qd.length >= 3 && c.phone.includes(qd)) || c.name.toLowerCase().includes(q) || AGENTS[c.a].name.toLowerCase().includes(q) || (c.notes || '').toLowerCase().includes(q)))
+    .map(c => ({...c, agentName: AGENTS[c.a].name, dirS: c.inc ? 'In' : 'Out', res: OUT_LABEL[c.b], stage: c.deal?.stage || '', owner: c.deal?.owner || ''}));
+  $('v-log').innerHTML = `<div class="row">
+      <input id="logQ" placeholder="Search number, name, agent, notes…" value="${esc(ST.logQ)}" style="flex:1;min-width:220px;background:var(--surface-2);border:1px solid var(--hair);border-radius:8px;padding:7px 10px">
+      <select id="logOut" style="background:var(--surface-2);border:1px solid var(--hair);border-radius:8px;padding:7px"><option value="">All outcomes</option>${OUT.map(o => `<option value="${o.k}" ${ST.logOut === o.k ? 'selected' : ''}>${o.label}</option>`).join('')}</select>
+      <span class="muted">${fmtInt(rows.length)} calls${rows.length > 1000 ? ' · showing latest 1,000 (CSV has all)' : ''}</span>
+      <button class="btn" id="csvLog">⬇ CSV</button></div>` + table('tLog', LOG_COLS, rows, {sort: 't', limit: 1000});
+  const inp = $('logQ'); inp.oninput = () => { ST.logQ = inp.value; clearTimeout(inp._t); inp._t = setTimeout(() => { renderLog(filtered()); const n = $('logQ'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
+  $('logOut').onchange = e => { ST.logOut = e.target.value; renderLog(filtered()); };
+  $('csvLog').onclick = () => csv(`frejun_calls_${ST.from}_${ST.to}.csv`, LOG_COLS, sortRows(rows, LOG_COLS, 't', 'desc'));
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-rec]'); if (!b) return;
+  b.disabled = true; b.textContent = '…';
+  try { const r = await fetch('/api/frejun-calls/recording?id=' + encodeURIComponent(b.dataset.rec)); const j = await r.json(); const u = j.sharable_url || j.recording_url; if (!u) throw 0; window.open(u, '_blank', 'noopener'); b.textContent = '▶ Open'; }
+  catch { b.textContent = 'n/a'; }
+  b.disabled = false;
+});
+
+// ── Logic ───────────────────────────────────────────────────────────────────
+function renderLogic(F) {
+  // Live classification of the selected range: raw FreJun status × dashboard result.
+  const m = new Map();
+  for (const c of F) { const k = c.st + '|' + c.b; const r = m.get(k) || {st: c.st || '(blank)', b: c.b, n: 0}; r.n++; m.set(k, r); }
+  const order = Object.fromEntries(OUT.map((o, i) => [o.k, i]));
+  const rows = [...m.values()].sort((a, b) => order[a.b] - order[b.b] || b.n - a.n);
+  const conn = F.filter(c => c.b === 'conn').length;
+  const th = l => `<th style="cursor:default">${l}</th>`, thn = l => `<th class="num" style="cursor:default">${l}</th>`;
+  const cls = '<div class="tablewrap"><table><thead><tr>' + th('FreJun status') + th('Talk time') + th('Dashboard result') + th('Counts as') + thn('Calls in range') + thn('Share') + '</tr></thead><tbody>' +
+    rows.map(r => `<tr><td>${esc(r.st)}</td><td>${r.st === 'answered' ? (r.b === 'conn' ? '&gt; ' + CONNECT_MIN_S + ' s' : '≤ ' + CONNECT_MIN_S + ' s') : 'any'}</td><td><span class="pill ${r.b}">${esc(OUT_LABEL[r.b])}</span></td><td><b>${r.b === 'conn' ? 'Connected' : 'Not connected'}</b></td><td class="num">${fmtInt(r.n)}</td><td class="num">${fmtPct(r.n, F.length)}</td></tr>`).join('') +
+    `<tr class="total"><td colspan="3">Total · ${esc(ST.from)} → ${esc(ST.to)}</td><td>${fmtInt(conn)} connected · ${fmtInt(F.length - conn)} not connected</td><td class="num">${fmtInt(F.length)}</td><td class="num">${fmtPct(conn, F.length)} connect</td></tr></tbody></table></div>`;
+  const li = a => '<ul class="ins">' + a.map(x => `<li>${x}</li>`).join('') + '</ul>';
+  $('v-logic').innerHTML =
+    card('Connected vs not connected', '', li([
+      `A call is <b>Connected</b> only when FreJun marks it <b>answered</b> <b>and</b> the customer stayed on the line for <b>more than ${CONNECT_MIN_S} seconds</b> of talk time.`,
+      `Every other call is <b>Not connected</b>: answered but <b>${CONNECT_MIN_S} s or less</b> (shown separately as “Answered ≤${CONNECT_MIN_S}s” so quick hang-ups stay visible), <b>not answered</b> (not-answered / user-not-answered), <b>unavailable / busy</b> (not_available / user-busy) and <b>other</b> (ongoing, not-initiated).`,
+      `All durations (talk time, averages, call-back and speed-to-call) are shown as <b>HH:MM:SS</b>; call times as <b>YYYY-MM-DD HH:MM:SS</b> IST.`,
+      `<b>Talk time</b> = FreJun <i>call_duration</i>. FreJun sends it in <b>minutes</b>; the dashboard converts it to seconds (×60). Ringing time is <b>not</b> counted — a call that rang 12 s and talked 25 s is <b>not connected</b>.`,
+      `Exactly ${CONNECT_MIN_S} s is <b>not connected</b> — the rule is strictly “more than ${CONNECT_MIN_S} s”.`])) +
+    card('How the rule applies to the selected range', 'Live counts for the current filters — every call lands in exactly one row.', cls) +
+    card('Where the rule is used', '', li([
+      `<b>Connect rate</b> = Connected ÷ all calls (Overview KPIs, daily chart, day × hour grid, agent table, Zoho Deals).`,
+      `<b>Reached</b> = unique numbers with at least one Connected call (Overview, Agents, Zoho Deals).`,
+      `<b>Follow-up:</b> a missed incoming call stays <b>unresolved</b> until a later call with that number is Connected; “Attempts to first connect” and “Dialled 3+, never reached” use the same rule.`,
+      `<b>Avg talk / connect</b> averages Connected calls only. <b>Talk time</b> totals every answered call (including ≤${CONNECT_MIN_S} s ones).`])) +
+    card('Other definitions', '', li([
+      `<b>Source:</b> BigQuery <code>frejun_data.frejun_call_log</code>, pulled from the FreJun API every 30 min (Cloud Scheduler <code>frejun-call-log-sync</code>). The page re-reads it at most every 5 min; ↻ Refresh forces it. History starts 23 Sep 2026. All times are <b>IST</b>.`,
+      `<b>Team:</b> shared store logins (Chembur, Borivali, Lajpat Nagar, Pashchim Vihar, Pune, Noida, Malleshwaram) = “Store accounts”; named people = “Central team”. Names come from Zoho CRM users.`,
+      `<b>Zoho deal match:</b> by mobile number (last 10 digits). Each call links to the latest deal on that number created before the call; stage and owner are the deal’s <i>current</i> values. Calls made from other dialers are not visible here.`,
+      `<b>Missed incoming → unresolved:</b> the latest incoming call per number that was not Connected, with no Connected call to/from that number since.`,
+      `<b>Speed to first call:</b> Zoho deal created → first outgoing FreJun call to that mobile. Same mobile + same day counts as one deal.`]));
+}
+
+// ── render / wiring ─────────────────────────────────────────────────────────
+function render() {
+  if (!RAW) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.v === ST.view));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + ST.view));
+  const F = filtered();
+  const on = [];
+  if (ST.dir !== '') on.push('Direction = <b>' + (ST.dir === '1' ? 'Incoming only' : 'Outgoing only') + '</b>');
+  if (ST.team !== '') on.push('Team = <b>' + (ST.team === 'store' ? 'Store accounts' : 'Central team') + '</b>');
+  if (ST.agent !== '') on.push('Agent = <b>' + esc(AGENTS[+ST.agent].name) + '</b>');
+  $('fbar').classList.toggle('on', on.length > 0);
+  $('fbar').innerHTML = on.length ? `⚠ Filters on: ${on.join(' · ')} — numbers below are <b>not</b> all calls. <button class="btn" id="clearF">✕ Clear filters</button>` : '';
+  if (on.length) $('clearF').onclick = () => { ST.dir = ST.team = ST.agent = ''; $('fDir').value = $('fTeam').value = $('fAgent').value = ''; render(); };
+  [['fDir', ST.dir], ['fTeam', ST.team], ['fAgent', ST.agent]].forEach(([id, v]) => $(id).classList.toggle('active', v !== ''));
+  ({ov: renderOverview, ag: renderAgents, fu: renderFollowup, zd: renderDeals, log: renderLog, logic: renderLogic})[ST.view](F);
+  bindTips($('v-' + ST.view));
+}
+$('tabs').onclick = e => { const t = e.target.closest('.tab'); if (!t) return; ST.view = t.dataset.v; try { localStorage.setItem('fj_view', ST.view); } catch {} render(); };
+$('rangeSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; setRange(b.dataset.r); render(); };
+$('dFrom').onchange = $('dTo').onchange = () => { ST.from = $('dFrom').value || ST.from; ST.to = $('dTo').value || ST.to; if (ST.from > ST.to) [ST.from, ST.to] = [ST.to, ST.from]; document.querySelectorAll('#rangeSeg button').forEach(b => b.classList.remove('on')); render(); };
+$('fTeam').onchange = e => { ST.team = e.target.value; render(); };
+$('fAgent').onchange = e => { ST.agent = e.target.value; render(); };
+$('fDir').onchange = e => { ST.dir = e.target.value; render(); };
+$('refreshBtn').onclick = () => load(true);
+$('themeBtn').onclick = () => { const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = t; try { localStorage.setItem('fj_theme', t); } catch {} };
+try { const t = localStorage.getItem('fj_theme'); if (t) document.documentElement.dataset.theme = t; const v = localStorage.getItem('fj_view'); if (v && document.querySelector('.tab[data-v="' + v + '"]')) ST.view = v; } catch {}
+{ const h = location.hash.slice(1); if (['ov', 'ag', 'fu', 'zd', 'log', 'logic'].includes(h)) ST.view = h; }   // deep link, e.g. #fu
+$('fDir').value = $('fTeam').value = $('fAgent').value = '';
+load(false);
+setInterval(() => { if (document.visibilityState === 'visible') load(false); }, 10 * 60 * 1000);
+</script>
+</body>
+</html>

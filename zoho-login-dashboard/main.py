@@ -18,6 +18,10 @@ import hmac
 import json
 import secrets
 import datetime as dt
+import gzip
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 from flask import (
@@ -35,6 +39,11 @@ USERS_TABLE   = os.environ.get("USERS_TABLE", "crm_users")
 SNAP_TABLE    = os.environ.get("SNAP_TABLE", "user_status_snapshots")
 GCS_BUCKET    = os.environ.get("GCS_BUCKET", "")
 REFRESH_BLOB  = os.environ.get("REFRESH_BLOB", "oauth/zoho_refresh_token.json")
+
+# Base URL of the deployed inventory-strategy-api (Cloud Run). Injected into the
+# dashboard so the lazy-loaded Stock tab (static/stock.html in an iframe) knows
+# which backend to query. Empty → the Stock iframe falls back to its own default.
+INVENTORY_API_BASE = os.environ.get("INVENTORY_API_BASE", "")
 
 ZOHO_DC       = os.environ.get("ZOHO_DC", "in").lower()          # in / com / eu / au / jp / ca
 ZOHO_CLIENT_ID     = os.environ.get("ZOHO_CLIENT_ID", "")
@@ -264,6 +273,27 @@ def run_sync() -> dict:
         result["cdc"] = sync_customer_events(at)
     except Exception as e:
         result["cdc_error"] = str(e)
+    # full rebuild-and-replace for the last few days of Deals (never break the rest of sync)
+    try:
+        result["deals_recent_rebuild"] = rebuild_deals_recent(at)
+    except Exception as e:
+        result["deals_recent_rebuild_error"] = str(e)
+    # incremental Deal->Product link fetch (never break the rest of sync)
+    try:
+        result["deal_products"] = sync_deal_products(at)
+    except Exception as e:
+        result["deal_products_error"] = str(e)
+    # Pre-build the Deals VS Call bundle from the freshly-synced tables, so the
+    # dashboard serves a ready file instead of running ~10 queries per page open.
+    try:
+        result["crm_bundle"] = _publish_crm_bundle(_build_crm_bundle())
+    except Exception as e:
+        result["crm_bundle_error"] = str(e)
+    # Zoho Deal Intelligence table (Buyer / Subscriber / Visitor / CTWA) from the fresh cdc_deals
+    try:
+        result["deal_intelligence"] = refresh_deal_intelligence()
+    except Exception as e:
+        result["deal_intelligence_error"] = str(e)
     return result
 
 
@@ -301,6 +331,12 @@ CDC_MODULES = {
                   "Other_Country,Other_Street,Other_Zip,Last_Enriched_Time__s,Enrich_Status__s"},
     "Deals": {
         "table": "cdc_deals",
+        # Address_City/Address_State_Province/Address_Zip_Postal_Code added 2026-09-21 —
+        # previously missing here entirely, which is why cdc_deals never carried address data
+        # (the separate Lucira_Prod.lucira_zoho_Deals export was the only source, and its own
+        # upstream sync stopped on 2026-09-16). Now that these are in the field list, both
+        # rebuild_deals_recent() and sync_module()'s cursor-MERGE pick them up automatically
+        # on every /sync run (every 30 min) — no separate pipeline needed going forward.
         "fields": "id,Owner,Created_Time,Modified_Time,Amount,Deal_Name,Closing_Date,"
                   "Account_Name,Stage,Type,Probability,Expected_Revenue,Next_Step,"
                   "Lead_Source,Campaign_Source,Contact_Name,Created_By,Modified_By,"
@@ -310,7 +346,11 @@ CDC_MODULES = {
                   "Stage_Modified_Time,Email,Mobile,UTM_Medium,Store_Assigned,"
                   "First_Activity_Date,UTM_Campaign,UTM_Source,Number_of_activity,"
                   "Last_Activity_date,Customer_activity_date,Intent_Stage,Assigned_At,"
-                  "Assignment_Status,Alternate_mobile,leadchain0__Social_Lead_ID"},
+                  "Assignment_Status,Alternate_mobile,leadchain0__Social_Lead_ID,"
+                  "Address_City,Address_State_Province,Address_Zip_Postal_Code,"
+                  # Probability_Score added 2026-10-03 for Deal Intelligence (49 of Zoho's 50-field
+                  # cap). History before this date: zoho_crm.deals_probability_score_patch (COQL pull).
+                  "Probability_Score"},
     "Tasks": {
         "table": "cdc_tasks",
         "fields": "id,Owner,Created_Time,Modified_Time,Subject,Due_Date,Who_Id,What_Id,"
@@ -336,7 +376,12 @@ CDC_MODULES = {
                   "Check_In_By,Check_In_Comment,Check_In_Sub_Locality,Check_In_City,"
                   "Check_In_State,Check_In_Country,Latitude,Longitude,ZIP_Code,"
                   "Check_In_Address,Check_In_Status,Tag,Remind_Participants,"
-                  "Last_Activity_Time,Meeting_Venue__s,Meeting_Provider__s,Record_Status__s"},
+                  "Last_Activity_Time,Meeting_Venue__s,Meeting_Provider__s,Record_Status__s,"
+                  # Custom meeting picklists added 2026-10-06 for the Omni Channel dashboard
+                  # (45 of Zoho's 50-field cap). History before this date:
+                  # zoho_crm.meetings_status_patch (one-time COQL pull of all 830 meetings).
+                  "Show_Status,Connection_Status,Conversion_Status,Meeting_Type,Meeting_Status,"
+                  "Store_Name,Mobile_Number,Show_Date,Follow_Up,Pincode"},
     "Online_Activity_Logs": {
         "table": "cdc_online_activities",
         "fields": "id,Owner,Created_Time,Modified_Time,Name,Activity_Type,Channel,"
@@ -501,6 +546,198 @@ def _module_conf(module: str):
         return CE_FIELDS, CE_TABLE, _ce_schema(), _norm_event, "customer_events"
     conf = CDC_MODULES[module]
     return conf["fields"], conf["table"], _cdc_schema(), _norm_cdc, conf["table"]
+
+
+# --------------------------------------------------------------------------- #
+# Deals recent-window rebuild — deliberately NOT cursor/incremental.
+# Every /sync run re-fetches ALL Deals created in the last REBUILD_DAYS days
+# (00:00 IST of day-N -> now), de-dupes by id, and REPLACES that whole window
+# in cdc_deals (delete + insert in one script, never append). Covers "today"
+# plus a couple of trailing days so a deal edited just after midnight rollover
+# still gets swept up, not just brand-new creations. Runs alongside (not
+# instead of) the Modified_Time cursor+MERGE sync that sync_module() still
+# does for every module including Deals, so older history is untouched — a
+# full re-pull of the whole table isn't possible anyway (Zoho's /search caps
+# out around 2000 records per query, far below total Deals volume).
+# --------------------------------------------------------------------------- #
+REBUILD_DAYS = 3   # today + 2 trailing days
+
+
+def _ist_recent_window(days_back: int = REBUILD_DAYS) -> tuple[str, str]:
+    now_ist = dt.datetime.utcnow() + dt.timedelta(hours=5, minutes=30)
+    start = (now_ist - dt.timedelta(days=days_back - 1)).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    return (start.strftime("%Y-%m-%dT%H:%M:%S+05:30"),
+            now_ist.strftime("%Y-%m-%dT%H:%M:%S+05:30"))
+
+
+def _fetch_deals_full_day(access_token: str, start_iso: str,
+                          max_pages: int = 20) -> list[dict]:
+    """Full pull of ALL Deals with Created_Time >= start_iso, via the same
+    Get-Records API _fetch_module_since already uses (reads the primary
+    datastore live, no search-index lag, no extra OAuth scope beyond what's
+    already granted). Sorted desc by Created_Time, paginated, stops as soon as
+    it passes below the window start — mirrors _fetch_module_since's own
+    stop-early pattern, just keyed on Created_Time instead of Modified_Time.
+
+    (Tried Zoho's /search endpoint first: it reads from a search index that
+    lags several minutes behind live writes and was undercounting same-day
+    deals during a burst of inbound-call auto-created deals. Tried COQL next:
+    401'd — this OAuth connection's scopes don't include ZohoCRM.coql.READ.
+    Get Records needs neither extra scope nor index catch-up.)"""
+    headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
+    out, page = [], 1
+    while page <= max_pages:
+        resp = requests.get(
+            f"{API_BASE}/crm/v8/Deals",
+            headers=headers,
+            params={"fields": CDC_MODULES["Deals"]["fields"], "per_page": 200,
+                    "sort_by": "Created_Time", "sort_order": "desc", "page": page},
+            timeout=60,
+        )
+        if resp.status_code == 204:
+            break
+        resp.raise_for_status()
+        body = resp.json()
+        stop = False
+        for r in body.get("data", []):
+            if (r.get("Created_Time") or "") < start_iso:
+                stop = True
+                break
+            out.append(r)
+        info = body.get("info", {})
+        if stop or not info.get("more_records"):
+            break
+        page += 1
+    return out
+
+
+def rebuild_deals_recent(access_token: str, days_back: int = REBUILD_DAYS) -> dict:
+    """Rebuild-and-replace the last `days_back` days of cdc_deals (by
+    Created_Time). Never appends: if the fetch comes back empty (Zoho hiccup,
+    not genuinely zero deals), it skips the delete/insert entirely rather than
+    risk wiping real data."""
+    start_iso, end_iso = _ist_recent_window(days_back)
+    start_str, end_str = start_iso[:10], end_iso[:10]
+    rows = _fetch_deals_full_day(access_token, start_iso)
+    if not rows:
+        return {"window": f"{start_str}..{end_str}", "skipped": "fetch returned 0 rows"}
+
+    synced_at = dt.datetime.utcnow().isoformat() + "Z"
+    seen, uniq = set(), []
+    for r in rows:
+        n = _norm_cdc(r, synced_at)
+        if n["id"] not in seen:
+            seen.add(n["id"]); uniq.append(n)
+
+    table = CDC_MODULES["Deals"]["table"]
+    schema = _cdc_schema()
+    tmp = f"{PROJECT}.{DATASET}.{table}_recent_staging"
+    obj = f"exports/{table}/recent_rebuild_{synced_at}.json"
+    _gcs.bucket(GCS_BUCKET).blob(obj).upload_from_string(
+        "\n".join(json.dumps(r, ensure_ascii=False) for r in uniq),
+        content_type="application/x-ndjson")
+    _bq.load_table_from_uri(
+        f"gs://{GCS_BUCKET}/{obj}", tmp,
+        job_config=bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+            schema=schema,
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE),
+    ).result()
+
+    cols = ", ".join(f.name for f in schema)
+    target = f"{PROJECT}.{DATASET}.{table}"
+    # Single script = one atomic transaction: delete the window's rows, insert
+    # the fresh deduped set. Two separate queries could leave the window empty
+    # if the process died in between; BEGIN/COMMIT makes that impossible.
+    _bq.query(f"""
+        BEGIN TRANSACTION;
+        DELETE FROM `{target}`
+          WHERE DATE(created_time, 'Asia/Kolkata') BETWEEN '{start_str}' AND '{end_str}';
+        INSERT INTO `{target}` ({cols}) SELECT {cols} FROM `{tmp}`;
+        COMMIT TRANSACTION;
+    """).result()
+    _bq.delete_table(tmp, not_found_ok=True)
+    return {"window": f"{start_str}..{end_str}", "fetched": len(rows), "rebuilt": len(uniq)}
+
+
+# --------------------------------------------------------------------------- #
+# Deal -> Product links — powers the "Product-wise Deals" panel.
+# Deals<->Products is a plain many-to-many related list (confirmed via CRM
+# metadata: no separate line-item/junction module exists), so it can only be
+# read one deal at a time via the Related Records API — no bulk/COQL join.
+# Incremental by design: only deals in the rolling REBUILD_DAYS window that
+# have NO row yet in deal_products get fetched, so a steady-state /sync run
+# only pays for brand-new deals, not the whole window every time. A deal with
+# zero linked products still gets one placeholder row (product_id NULL) so it
+# isn't re-fetched forever.
+# --------------------------------------------------------------------------- #
+DEAL_PRODUCTS_TABLE = "deal_products"
+DEAL_PRODUCTS_BATCH = 300   # bounds one /sync call's wall-clock time
+
+
+def _deal_products_schema():
+    S = bigquery.SchemaField
+    return [
+        S("deal_id", "STRING"), S("product_id", "STRING"),
+        S("product_name", "STRING"), S("product_code", "STRING"),
+        S("synced_at", "TIMESTAMP"),
+    ]
+
+
+def sync_deal_products(access_token: str, days_back: int = REBUILD_DAYS,
+                       batch: int = DEAL_PRODUCTS_BATCH) -> dict:
+    start_iso, end_iso = _ist_recent_window(days_back)
+    start_str, end_str = start_iso[:10], end_iso[:10]
+    pending = list(_bq.query(f"""
+        SELECT d.id
+        FROM `{PROJECT}.{DATASET}.cdc_deals` d
+        LEFT JOIN `{PROJECT}.{DATASET}.{DEAL_PRODUCTS_TABLE}` dp ON d.id = dp.deal_id
+        WHERE DATE(d.created_time, '{TZ}') BETWEEN '{start_str}' AND '{end_str}'
+          AND dp.deal_id IS NULL
+        GROUP BY d.id
+        LIMIT {batch}
+    """).result())
+    if not pending:
+        return {"window": f"{start_str}..{end_str}", "checked": 0}
+
+    headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
+    synced_at = dt.datetime.utcnow().isoformat() + "Z"
+    out = []
+    errors = 0
+    for r in pending:
+        did = r["id"]
+        try:
+            resp = requests.get(
+                f"{API_BASE}/crm/v8/Deals/{did}/Products",
+                headers=headers, params={"fields": "id,Product_Name,Product_Code"},
+                timeout=30,
+            )
+        except requests.RequestException:
+            errors += 1
+            continue
+        if resp.status_code == 204:
+            out.append({"deal_id": did, "product_id": None, "product_name": None,
+                       "product_code": None, "synced_at": synced_at})
+            continue
+        if resp.status_code != 200:
+            errors += 1
+            continue
+        products = (resp.json() or {}).get("data") or []
+        if not products:
+            out.append({"deal_id": did, "product_id": None, "product_name": None,
+                       "product_code": None, "synced_at": synced_at})
+        for p in products:
+            out.append({
+                "deal_id": did, "product_id": str(p.get("id")) if p.get("id") else None,
+                "product_name": p.get("Product_Name"), "product_code": p.get("Product_Code"),
+                "synced_at": synced_at,
+            })
+    if out:
+        _load_ndjson_to_bq(out, DEAL_PRODUCTS_TABLE, _deal_products_schema(),
+                           bigquery.WriteDisposition.WRITE_APPEND, "exports/deal_products")
+    return {"window": f"{start_str}..{end_str}", "checked": len(pending),
+           "linked_rows": len(out), "errors": errors}
 
 
 def sync_module(access_token: str, module: str, since_iso: str | None = None) -> dict:
@@ -788,8 +1025,8 @@ def _users_query(d_from, d_to, filt, user_id=None):
     meetagg AS (
       SELECT m.owner_id AS user_id, COUNT(*) AS meetings
       FROM {MEET} m, rng
-      WHERE SAFE.PARSE_TIMESTAMP('%FT%T%Ez', JSON_VALUE(m.data,'$.Start_DateTime')) >= rng.ts_from
-        AND SAFE.PARSE_TIMESTAMP('%FT%T%Ez', JSON_VALUE(m.data,'$.Start_DateTime')) < rng.ts_to
+      -- "raised" = created in range (matches Zoho's Created Time), not the scheduled start
+      WHERE m.created_time >= rng.ts_from AND m.created_time < rng.ts_to
       GROUP BY 1
     ),
     tasksagg AS (
@@ -973,7 +1210,7 @@ def _sync_status():
         "first_snapshot": _ist_str(r["first_snapshot"], "%d %b %Y %H:%M"),
         "snapshot_rows": r["snapshot_rows"],
         "sync_runs": r["sync_runs"],
-        "cadence": os.environ.get("SYNC_CADENCE", "every 15 min (Asia/Kolkata)"),
+        "cadence": os.environ.get("SYNC_CADENCE", "every 30 min (Asia/Kolkata)"),
         "scheduler_job": "zoho-sync",
     }
 
@@ -989,7 +1226,15 @@ def dashboard():
         opts = _filter_options()
     except Exception as e:
         return f"Query failed: {e}", 500
-    return render_template("dashboard.html", d_from=d_from, d_to=d_to, filt=filt, opts=opts)
+    return render_template("dashboard.html", d_from=d_from, d_to=d_to, filt=filt, opts=opts,
+                           inv_api=INVENTORY_API_BASE)
+
+
+@app.route("/deals-vs-call")
+def deals_vs_call():
+    """Standalone Deals VS Call analytics dashboard (client-side; reads /static/app.js + /static/data.js).
+    Embedded as a top-level '📊 Deals VS Call' tab inside /dashboard via a lazy-loaded iframe."""
+    return render_template("deals_vs_call.html")
 
 
 # ----- JSON APIs backing the independent dashboard cards --------------------- #
@@ -1069,6 +1314,526 @@ def api_insights_chat():
 @app.route("/api/tables")
 def api_tables():
     return jsonify(tables=_table_stats(), sync=_sync_status())
+
+
+# --------------------------------------------------------------------------- #
+# Live data feed for the embedded "Deals VS Call" dashboard
+# --------------------------------------------------------------------------- #
+def _crm_ce(P, cutoff):
+    """Customer-events aggregate for the bundle (byCatDay + cats + rawTop + total)."""
+    catcase = """CASE
+      WHEN LOWER(event_type) LIKE '%signup%' OR LOWER(event_type) LIKE '%sign up%' OR LOWER(event_type) LIKE '%singup%' THEN 'Signup'
+      WHEN LOWER(event_type) LIKE '%checkout%' THEN 'Checkout'
+      WHEN LOWER(event_type) = 'atc' OR LOWER(event_type) LIKE '%add to cart%' OR LOWER(event_type) LIKE '%add_to_cart%' OR LOWER(event_type) LIKE '%addtocart%' THEN 'ATC'
+      WHEN LOWER(event_type) LIKE '%payment%' OR LOWER(event_type) LIKE '%purchase%' THEN 'Purchase'
+      WHEN LOWER(event_type) LIKE '%whatsapp%' THEN 'WhatsApp'
+      WHEN LOWER(event_type) LIKE '%productview%' OR LOWER(event_type) LIKE '%product view%' OR LOWER(event_type) LIKE '%pageview%' OR LOWER(event_type) LIKE '%nitroproduct%' THEN 'ProductView'
+      WHEN LOWER(event_type) LIKE '%website%' THEN 'Website Visit'
+      ELSE INITCAP(COALESCE(event_type,'(none)')) END"""
+    byCatDay, cats, total = {}, set(), 0
+    for r in _bq.query(f"""
+        SELECT {catcase} cat, CAST(DATE(event_time,'{TZ}') AS STRING) day, COUNT(*) n
+        FROM {P}customer_events`
+        WHERE DATE(event_time,'{TZ}') >= '{cutoff}' AND event_type IS NOT NULL
+        GROUP BY cat, day""").result():
+        byCatDay.setdefault(r["cat"] or "(none)", {})[r["day"]] = r["n"]
+        cats.add(r["cat"] or "(none)"); total += r["n"]
+    rawTop = [{"t": r["t"], "n": r["n"]} for r in _bq.query(f"""
+        SELECT event_type t, COUNT(*) n FROM {P}customer_events`
+        WHERE DATE(event_time,'{TZ}') >= '{cutoff}' AND event_type IS NOT NULL
+        GROUP BY t ORDER BY n DESC LIMIT 25""").result()]
+    return {"byCat": {}, "byCatDay": byCatDay, "byDay": {}, "cats": sorted(cats),
+            "rawTop": rawTop, "total": total}
+
+
+def _build_crm_bundle() -> dict:
+    """LIVE data feed for the Deals VS Call dashboard.
+
+    Rebuilds the SAME positional bundle as dashboard/data.js — but straight from
+    the cdc_* BigQuery tables (synced from Zoho every 30 min) — so Deals VS Call
+    is always current instead of frozen on a static snapshot. Wired on the client
+    via CONFIG.CRM_API (window.CRM_API_BASE injected in deals_vs_call.html)."""
+    cutoff = os.environ.get("CRM_CUTOFF", "2026-05-31")
+    P = f"`{PROJECT}.{DATASET}."
+    ts = f"FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', created_time, '{TZ}')"
+    rng = f"DATE(created_time,'{TZ}') >= '{cutoff}'"
+    rows = lambda sql: list(_bq.query(sql).result())
+    # All queries are independent — run them concurrently (was ~60 s one-by-one).
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        run = lambda sql: pool.submit(rows, sql)
+        # City/State sourcing, 3 tiers by freshness (COALESCE picks the first non-blank):
+        #  1. cdc_deals' own JSON (d.data) — Address_City/Address_State_Province were added to
+        #     CDC_MODULES["Deals"]["fields"] on 2026-09-21; every /sync run (every 30 min) now
+        #     carries them straight from Zoho, going forward, no join needed at all.
+        #  2. zoho_crm.deals_address_live_patch — a one-time historical backfill pulled directly
+        #     from the Zoho CRM API (COQL) for deals created 2026-09-16 onward, covering the
+        #     gap left by tier 3's outage (see below). Not auto-refreshing; tier 1 supersedes it
+        #     for anything synced after 2026-09-21.
+        #  3. Lucira_Prod.lucira_zoho_Deals — the original address export. Its own upstream sync
+        #     (a Zoho-side workflow → BigQuery pipeline) stopped writing after 2026-09-16; still
+        #     the correct source for deals created before that date.
+        # Zoho literally returns the string "NA" for some blank addresses — treated as blank, not a city.
+        # Feeds pd()'s city/state fields in app.js so the City-wise/State-wise Performance tables
+        # (next to Owner Performance) stop always reading "(Not Captured)".
+        q_deals = run(f"""
+            SELECT d.id, JSON_VALUE(d.data,'$.Deal_Name') name, d.owner_id owner, {ts.replace('created_time','d.created_time')} created,
+                   JSON_VALUE(d.data,'$.Stage') stage,
+                   SAFE_CAST(JSON_VALUE(d.data,'$.Probability') AS FLOAT64) prob,
+                   -- Zoho "Probability (%)" score (Probability_Score), not the stage Probability
+                   -- (blank on cdc_deals). CDC JSON wins; deals synced before the field was added
+                   -- (2026-10-03) fall back to the one-time COQL history patch.
+                   COALESCE(SAFE_CAST(JSON_VALUE(d.data,'$.Probability_Score') AS FLOAT64),
+                            pp.probability_score) prob_score,
+                   JSON_VALUE(d.data,'$.Lead_Source') lead_source,
+                   JSON_VALUE(d.data,'$.Reason_For_Loss__s') reason_loss,
+                   JSON_VALUE(d.data,'$.Deal_Trigger_Event') trigger,
+                   JSON_VALUE(d.data,'$.UTM_Source') utm_source,
+                   JSON_VALUE(d.data,'$.UTM_Medium') utm_medium,
+                   SAFE_CAST(JSON_VALUE(d.data,'$.Number_of_activity') AS INT64) num_act,
+                   RIGHT(REGEXP_REPLACE(COALESCE(JSON_VALUE(d.data,'$.Mobile'),''),r'[^0-9]',''),10) mobile,
+                   INITCAP(TRIM(COALESCE(
+                     NULLIF(NULLIF(TRIM(JSON_VALUE(d.data,'$.Address_City')),''),'NA'),
+                     NULLIF(NULLIF(TRIM(patch.address_city),''),'NA'),
+                     loc.Address_City))) city,
+                   COALESCE(
+                     NULLIF(NULLIF(TRIM(JSON_VALUE(d.data,'$.Address_State_Province')),''),'NA'),
+                     NULLIF(NULLIF(TRIM(patch.address_state),''),'NA'),
+                     loc.Address_State) state,
+                   -- Address Zip, same 3 tiers as city; only a real 6-digit code survives.
+                   -- Maps a deal to its store row in City-wise Performance (STORE_BY_PIN in app.js).
+                   COALESCE(
+                     REGEXP_EXTRACT(JSON_VALUE(d.data,'$.Address_Zip_Postal_Code'), r'\\b([1-9][0-9]{{5}})\\b'),
+                     REGEXP_EXTRACT(patch.address_zip, r'\\b([1-9][0-9]{{5}})\\b'),
+                     REGEXP_EXTRACT(CAST(loc.Address_Zip AS STRING), r'\\b([1-9][0-9]{{5}})\\b')) zip
+            FROM {P}cdc_deals` d
+            LEFT JOIN `lucirajewelry-prod.Lucira_Prod.lucira_zoho_Deals` loc ON d.id = loc.id
+            LEFT JOIN `{PROJECT}.{DATASET}.deals_address_live_patch` patch ON d.id = patch.id
+            LEFT JOIN (SELECT id, ANY_VALUE(probability_score) probability_score
+                       FROM `{PROJECT}.{DATASET}.deals_probability_score_patch` GROUP BY id) pp ON d.id = pp.id
+            WHERE {rng.replace('created_time','d.created_time')}""")
+        # `phone` is what joinDeals (app.js) uses to match a call to a deal's Mobile (last 10
+        # digits) when the call has no What_Id -> Deal link. Until 2026-10-28 the dialer wrote
+        # the number into Subject ("Outgoing call to X (+91...)"); from 2026-10-29 the Subject
+        # carries only the name, so roughly half of all calls (the ones logged against the
+        # Contact only) silently stopped matching and their deals were reported as "pending
+        # call" even though the agent had dialed. Customer number by direction:
+        # Outbound -> To_Number__s; Inbound / Missed -> From_Number__s (To is the agent line);
+        # then Dialled_Number, the linked Contact's Mobile/Phone (Who_Id), and Subject digits
+        # as the last resort (keeps pre-2026-10-29 behaviour for old rows).
+        q_calls = run(f"""
+            SELECT c.id, c.owner_id owner, {ts.replace('created_time','c.created_time')} created,
+                   JSON_VALUE(c.data,'$.Call_Type') type,
+                   SAFE_CAST(JSON_VALUE(c.data,'$.Call_Duration_in_seconds') AS INT64) dur,
+                   JSON_VALUE(c.data,'$.Call_Start_Time') cstart,
+                   JSON_VALUE(c.data,'$.What_Id.id') what_id,
+                   RIGHT(REGEXP_REPLACE(COALESCE(
+                     NULLIF(IF(JSON_VALUE(c.data,'$.Call_Type') IN ('Inbound','Missed'),
+                               JSON_VALUE(c.data,'$.From_Number__s'),
+                               JSON_VALUE(c.data,'$.To_Number__s')), ''),
+                     NULLIF(JSON_VALUE(c.data,'$.Dialled_Number'), ''),
+                     NULLIF(ct.mobile, ''),
+                     JSON_VALUE(c.data,'$.Subject'), ''), r'[^0-9]', ''), 10) phone,
+                   JSON_VALUE(c.data,'$.Call_Result') result
+            FROM {P}cdc_calls` c
+            LEFT JOIN (SELECT id, COALESCE(NULLIF(JSON_VALUE(data,'$.Mobile'),''), JSON_VALUE(data,'$.Phone')) mobile
+                       FROM {P}cdc_contacts`) ct ON JSON_VALUE(c.data,'$.Who_Id.id') = ct.id
+            WHERE {rng.replace('created_time','c.created_time')}""")
+        q_tasks = run(f"""
+            SELECT id, owner_id owner, {ts} created,
+                   JSON_VALUE(data,'$.Status') status, JSON_VALUE(data,'$.Due_Date') due,
+                   JSON_VALUE(data,'$.Closed_Time') closed,
+                   JSON_VALUE(data,'$.What_Id.id') what_id
+            FROM {P}cdc_tasks` WHERE {rng}""")
+        q_online = run(f"""
+            SELECT id, owner_id owner, {ts} created,
+                   JSON_VALUE(data,'$.Channel') channel, JSON_VALUE(data,'$.Activity_Type') atype
+            FROM {P}cdc_online_activities` WHERE {rng}""")
+        q_events = run(f"""
+            SELECT id, owner_id owner, {ts} created,
+                   JSON_VALUE(data,'$.Start_DateTime') estart,
+                   JSON_VALUE(data,'$.End_DateTime') eend, JSON_VALUE(data,'$.Event_Title') title,
+                   JSON_VALUE(data,'$.What_Id.id') what_id
+            FROM {P}cdc_meetings` WHERE {rng}""")
+        q_owners = run(f"""
+            SELECT owner_id, ANY_VALUE(owner_name) nm FROM (
+              SELECT owner_id, owner_name FROM {P}cdc_deals`
+              UNION ALL SELECT owner_id, owner_name FROM {P}cdc_calls`
+              UNION ALL SELECT owner_id, owner_name FROM {P}cdc_tasks`
+              UNION ALL SELECT owner_id, owner_name FROM {P}cdc_meetings`
+              UNION ALL SELECT owner_id, owner_name FROM {P}cdc_online_activities`)
+            WHERE owner_id IS NOT NULL GROUP BY owner_id""")
+        # Agent login hours (zoho_crm.agent_login_status_daily, one row per agent per IST day,
+        # rebuilt by scheduled query daily 10:00 IST — so "today" is partial until the next run).
+        # working_hours = merged activity/online sessions, the key per-agent effort metric.
+        q_login = run(f"""
+            SELECT CAST(activity_date AS STRING) d, CAST(user_id AS STRING) uid, full_name nm,
+                   ROUND(working_hours, 4) wh,
+                   FORMAT_TIMESTAMP('%H:%M', work_start, '{TZ}') st,
+                   FORMAT_TIMESTAMP('%H:%M', work_end, '{TZ}') en,
+                   ROUND(break_hours, 4) bh
+            FROM {P}agent_login_status_daily`
+            WHERE activity_date >= '{cutoff}' AND working_hours > 0""")
+        q_ce = pool.submit(_crm_ce, P, cutoff)
+        # Deal->Product links (see sync_deal_products) for deals in this same range.
+        # One row per link; a deal with no linked product simply has no row here —
+        # never fabricated. Backfill is incremental (see sync_deal_products), so
+        # very recently created deals may not have been checked yet.
+        # Each link is resolved to Items Master for the Product Cut section (style / variant /
+        # size / karat / price band / gender / category) through the same mapping layer as
+        # Zoho product mapping layer (pii/product_inventory.sql): product_code = master SKU first, else
+        # the Zoho product record's own mapping (Name + Shopify ID -> style). Every join below
+        # is to a 1-row-per-key relation, so the link count is never multiplied.
+        q_deal_products = run(f"""
+            WITH dp AS (
+              SELECT dp.deal_id, dp.product_id, dp.product_name, dp.product_code
+              FROM `{PROJECT}.{DATASET}.{DEAL_PRODUCTS_TABLE}` dp
+              JOIN {P}cdc_deals` d ON dp.deal_id = d.id
+              WHERE {rng.replace('created_time','d.created_time')} AND dp.product_id IS NOT NULL),
+            m AS (SELECT master_sku, master_style, k_code, karat, category FROM {P}v_pii_item_master`),
+            zm AS (SELECT REGEXP_REPLACE(record_id, r'^zcrm_', '') pid, mapped_sku, mapped_style
+                   FROM {P}v_zoho_product_map`),
+            res AS (
+              SELECT dp.*, COALESCE(mc.master_sku, zm.mapped_sku) sku,
+                     COALESCE(mc.master_style, zm.mapped_style) style
+              FROM dp
+              LEFT JOIN m mc ON mc.k_code = UPPER(TRIM(dp.product_code))
+              LEFT JOIN zm ON zm.pid = CAST(dp.product_id AS STRING)),
+            zpd AS (SELECT product_sku, product_gender FROM `{PROJECT}.ds_imputed_reporting.zoho_product_details`
+                    WHERE product_gender IS NOT NULL),
+            g AS (SELECT UPPER(product_sku) sku, ANY_VALUE(product_gender) gender FROM zpd GROUP BY 1),
+            gs AS (SELECT IF(STARTS_WITH(UPPER(product_sku), 'LJ-'), REGEXP_EXTRACT(UPPER(product_sku), r'^(LJ-[^-]+)'),
+                             UPPER(product_sku)) style,
+                          IF(COUNT(DISTINCT product_gender) = 1, ANY_VALUE(product_gender), 'Mixed') gender
+                   FROM zpd GROUP BY 1),
+            st AS (SELECT master_style, IF(COUNT(DISTINCT category) = 1, ANY_VALUE(category), 'Mixed') category
+                   FROM m GROUP BY 1)
+            SELECT res.deal_id, res.product_name, res.product_code, res.style, res.sku,
+                   IF(res.sku IS NULL, NULL, IFNULL(REGEXP_EXTRACT(res.sku, r'^LJ-[^-]+-[^-]+-(.+)$'), 'No size')) size,
+                   ms.karat, IF(res.sku IS NULL, NULL, IFNULL(p.price_band, 'No Price')) price_band,
+                   COALESCE(g.gender, gs.gender) gender, COALESCE(ms.category, st.category) category
+            FROM res
+            LEFT JOIN m ms ON ms.master_sku = res.sku
+            LEFT JOIN {P}v_pii_item_price` p ON p.master_sku = res.sku
+            LEFT JOIN g ON g.sku = UPPER(res.sku)
+            LEFT JOIN gs ON gs.style = res.style
+            LEFT JOIN st ON st.master_style = res.style""")
+    deals = [[r["id"], r["name"], r["owner"], r["created"], r["stage"], r["prob"],
+              r["lead_source"], r["reason_loss"], r["trigger"], r["utm_source"],
+              r["utm_medium"], r["num_act"] or 0, r["mobile"] or "",
+              r["city"] or "", r["state"] or "", r["prob_score"], r["zip"] or ""] for r in q_deals.result()]
+    calls = [[r["id"], r["owner"], r["created"], r["type"], r["dur"] or 0,
+              r["cstart"], r["what_id"] or "", r["phone"] or "", r["result"] or ""] for r in q_calls.result()]
+    tasks = [[r["id"], r["owner"], r["created"], r["status"], r["due"], r["closed"], r["what_id"] or ""]
+             for r in q_tasks.result()]
+    online = [[r["id"], r["owner"], r["created"], r["channel"], r["atype"]]
+              for r in q_online.result()]
+    events = [[r["id"], r["owner"], r["created"], r["estart"], r["eend"], r["title"], r["what_id"] or ""]
+              for r in q_events.result()]
+    owners = {r["owner_id"]: r["nm"] for r in q_owners.result()}
+    deal_products = [[r["deal_id"], r["product_name"] or "", r["product_code"] or "",
+                      r["style"] or "", r["sku"] or "", r["size"] or "", r["karat"] or "",
+                      r["price_band"] or "", r["gender"] or "", r["category"] or ""]
+                     for r in q_deal_products.result()]
+    ce = q_ce.result()
+    login = [[r["d"], r["uid"], r["nm"] or "", r["wh"] or 0, r["st"] or "", r["en"] or "", r["bh"] or 0]
+             for r in q_login.result()]
+
+    from datetime import datetime, timezone, timedelta
+    gen = datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime("%Y-%m-%dT%H:%M:%S+05:30")
+    return dict(owners=owners, deals=deals, calls=calls, tasks=tasks, online=online,
+                events=events, ce=ce, deal_products=deal_products, login=login,
+                meta={"generated": gen, "cutoff": cutoff + "T00:00:00", "tz": "Asia/Kolkata",
+                      "pagesRead": 0, "source": "cdc_bigquery"})
+
+
+# Pre-built bundle cache. /sync rebuilds it every 30 min right after the CDC merge
+# (the only time the cdc_* tables change), stores it gzipped in GCS, and every
+# instance serves that file from memory — so opening / refreshing the dashboard
+# costs one ~4 MB download instead of ~10 BigQuery queries + 29 MB of JSON.
+BUNDLE_BLOB    = os.environ.get("CRM_BUNDLE_BLOB", "cache/crm_bundle.json.gz")
+BUNDLE_MAX_AGE = int(os.environ.get("CRM_BUNDLE_MAX_AGE", "2700"))  # 45 min: > one sync cycle
+_bundle = {"gz": None, "gen": None, "checked": 0.0, "built": 0.0}
+_bundle_lock = threading.Lock()
+
+
+def _publish_crm_bundle(b: dict) -> dict:
+    gz = gzip.compress(json.dumps(b, separators=(",", ":"), default=str).encode(), 6)
+    gen = None
+    if GCS_BUCKET:
+        blob = _gcs.bucket(GCS_BUCKET).blob(BUNDLE_BLOB)
+        blob.upload_from_string(gz, content_type="application/gzip")
+        gen = blob.generation
+    now = time.time()
+    _bundle.update(gz=gz, gen=gen, checked=now, built=now)
+    return {"bytes_gz": len(gz), "deals": len(b["deals"]), "generated": b["meta"]["generated"]}
+
+
+def _crm_bundle_gz() -> bytes:
+    """Fresh gzipped bundle: memory → GCS (if another instance / /sync rebuilt it)
+    → build now as a last resort (missing or older than BUNDLE_MAX_AGE)."""
+    if _bundle["gz"] and time.time() - _bundle["checked"] < 60:
+        return _bundle["gz"]
+    with _bundle_lock:                       # concurrent cold requests wait for one build
+        now = time.time()
+        if _bundle["gz"] and now - _bundle["checked"] < 60:
+            return _bundle["gz"]
+        blob = None
+        if GCS_BUCKET:
+            try:
+                blob = _gcs.bucket(GCS_BUCKET).get_blob(BUNDLE_BLOB)
+            except Exception:
+                blob = None
+        if blob is not None and now - blob.updated.timestamp() < BUNDLE_MAX_AGE:
+            if blob.generation != _bundle["gen"]:
+                _bundle.update(gz=blob.download_as_bytes(), gen=blob.generation,
+                               built=blob.updated.timestamp())
+            _bundle["checked"] = now
+            return _bundle["gz"]
+        if _bundle["gz"] and now - _bundle["built"] < BUNDLE_MAX_AGE:
+            _bundle["checked"] = now         # GCS unreachable but memory copy still fresh
+            return _bundle["gz"]
+        _publish_crm_bundle(_build_crm_bundle())
+        return _bundle["gz"]
+
+
+@app.route("/api/crm-bundle")
+def api_crm_bundle():
+    """Deals VS Call data feed (wired via window.CRM_API_BASE in deals_vs_call.html).
+    Served pre-gzipped from the cache above; ?rebuild=1 forces a fresh build."""
+    try:
+        if request.args.get("rebuild") == "1":
+            with _bundle_lock:
+                _publish_crm_bundle(_build_crm_bundle())
+        gz = _crm_bundle_gz()
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    hdr = {"Cache-Control": "no-store", "Vary": "Accept-Encoding"}
+    if "gzip" in (request.headers.get("Accept-Encoding") or "").lower():
+        return Response(gz, 200, {**hdr, "Content-Encoding": "gzip"}, mimetype="application/json")
+    return Response(gzip.decompress(gz), 200, hdr, mimetype="application/json")
+
+
+# --------------------------------------------------------------------------- #
+# Zoho Deal Intelligence (static/deal-intelligence.html)
+# --------------------------------------------------------------------------- #
+# Prepared table zoho_crm.zoho_deal_intelligence (deal_intel/build_deal_intelligence.sql):
+# 1 row per Zoho deal with raw fields + Buyer / Subscriber / Visitor / CTWA flags and the
+# final Deal_Category. Rebuilt by run_sync() right after the CDC merge (every 30 min).
+# The browser gets every deal once (~35k rows, gzipped) and does all date / agent /
+# city / postal / probability filtering locally, so filter changes cost no query.
+DI_TABLE = f"`{PROJECT}.{DATASET}.zoho_deal_intelligence`"
+_DI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deal_intel")
+_DI_COLS = ["deal_id", "created", "customer_name", "mobile", "email", "agent", "deal_stage",
+            "lead_source", "deal_trigger_event", "address_city", "city_source", "postal_code",
+            "postal_source", "probability_score", "probability_band", "minimum_sale_date",
+            "days_since_previous_sale", "sale_match_method", "buyer_reason", "buyer_flag",
+            "subscriber_flag", "visitor_flag", "ctwa_flag", "deal_category", "matched_rules"]
+_di_cache = {"at": 0.0, "gz": None}
+_di_lock = threading.Lock()
+
+
+def refresh_deal_intelligence() -> dict:
+    with open(os.path.join(_DI_DIR, "build_deal_intelligence.sql"), encoding="utf-8") as f:
+        _bq.query(f.read()).result()
+    _di_cache.update(at=0.0, gz=None)
+    r = list(_bq.query(f"SELECT COUNT(*) n, COUNTIF(buyer_flag) b FROM {DI_TABLE}").result())[0]
+    return {"deals": r["n"], "buyers": r["b"]}
+
+
+def _di_payload() -> dict:
+    q_rows = _bq.query(f"""
+        SELECT deal_id, FORMAT_DATETIME('%Y-%m-%d %H:%M', deal_created_ts_ist) created,
+               customer_name, COALESCE(mobile_norm, mobile_raw) mobile, email_raw email, agent,
+               deal_stage, lead_source, deal_trigger_event, address_city, city_source, postal_code,
+               postal_source, probability_score, probability_band,
+               CAST(minimum_sale_date AS STRING) minimum_sale_date, days_since_previous_sale,
+               sale_match_method, buyer_reason, buyer_flag, subscriber_flag, visitor_flag,
+               ctwa_flag, deal_category, matched_rules
+        FROM {DI_TABLE} ORDER BY deal_created_ts_ist DESC""")
+    q_meta = _bq.query(f"""
+        SELECT FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S+05:30', MAX(built_at), '{TZ}') built_at,
+               (SELECT FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S+05:30', MAX(synced_at), '{TZ}')
+                  FROM `{PROJECT}.{DATASET}.cdc_deals`) zoho_synced_at,
+               (SELECT CAST(MAX(Transaction_Date) AS STRING)
+                  FROM `{PROJECT}.ds_imputed_reporting.marketing_sale`) sales_through,
+               COUNT(*) n, COUNT(DISTINCT deal_id) ids,
+               COUNTIF(mobile_norm IS NULL) no_mobile, COUNTIF(email_norm IS NULL) no_email,
+               COUNTIF(customer_name IS NULL) no_name, COUNTIF(address_city IS NULL) no_city,
+               COUNTIF(postal_code IS NULL) no_postal, COUNTIF(probability_score IS NULL) no_prob,
+               COUNTIF(mobile_raw IS NOT NULL AND mobile_norm IS NULL) bad_mobile,
+               COUNTIF(email_raw IS NOT NULL AND email_norm IS NULL) placeholder_email,
+               COUNTIF(city_source = 'Contact') city_from_contact,
+               COUNTIF(postal_source = 'Contact') postal_from_contact
+        FROM {DI_TABLE}""")
+    q_dupe = _bq.query(f"""
+        SELECT COUNTIF(n > 1) dup_groups, SUM(IF(n > 1, n - 1, 0)) extra_deals FROM (
+          SELECT mobile_norm, deal_created_date, COUNT(*) n FROM {DI_TABLE}
+          WHERE mobile_norm IS NOT NULL GROUP BY 1, 2)""")
+    q_sale = _bq.query(f"""
+        SELECT COUNT(*) sale_rows, COUNT(DISTINCT document_no) invoices,
+               COUNT(DISTINCT RIGHT(REGEXP_REPLACE(Cus_mobile, r'[^0-9]', ''), 10)) customers,
+               COUNTIF(REGEXP_CONTAINS(LOWER(email), r'^\\+?[0-9]+@') OR ENDS_WITH(LOWER(email), '@lucirajewelry.com')) placeholder_email
+        FROM `{PROJECT}.ds_imputed_reporting.marketing_sale`""")
+    rows = [[r[c] for c in _DI_COLS] for r in q_rows.result()]
+    meta = dict(list(q_meta.result())[0])
+    meta["same_mobile_same_day"] = dict(list(q_dupe.result())[0])
+    meta["sales"] = dict(list(q_sale.result())[0])
+    return {"cols": _DI_COLS, "rows": rows, "meta": meta}
+
+
+def _di_freshness() -> tuple:
+    """(table built_at, latest cdc_deals sync) — two tiny metadata-style queries."""
+    r = list(_bq.query(f"""
+        SELECT (SELECT MAX(built_at) FROM {DI_TABLE}) built_at,
+               (SELECT MAX(synced_at) FROM `{PROJECT}.{DATASET}.cdc_deals`) synced_at""").result())[0]
+    return r["built_at"], r["synced_at"]
+
+
+@app.route("/api/deal-intel")
+def api_deal_intel():
+    """Every Zoho deal with its Deal Intelligence flags (positional rows, gzipped).
+    LIVE on every open: if Zoho deals were synced after the table was built, the table is
+    rebuilt first; the payload is re-read whenever the table changed (cache keyed on built_at).
+    ?rebuild=1 forces a rebuild."""
+    try:
+        with _di_lock:
+            built, synced = _di_freshness()
+            if request.args.get("rebuild") == "1" or built is None or (synced and synced > built):
+                refresh_deal_intelligence()
+                built, synced = _di_freshness()
+            if not _di_cache["gz"] or _di_cache.get("built") != built:
+                body = json.dumps(_di_payload(), separators=(",", ":"), default=str).encode()
+                _di_cache.update(gz=gzip.compress(body, 6), at=time.time(), built=built)
+            gz = _di_cache["gz"]
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    hdr = {"Cache-Control": "no-store", "Vary": "Accept-Encoding"}
+    if "gzip" in (request.headers.get("Accept-Encoding") or "").lower():
+        return Response(gz, 200, {**hdr, "Content-Encoding": "gzip"}, mimetype="application/json")
+    return Response(gzip.decompress(gz), 200, hdr, mimetype="application/json")
+
+
+# --------------------------------------------------------------------------- #
+# FreJun Call Intelligence (static/frejun-calls.html)
+# --------------------------------------------------------------------------- #
+# Source: frejun_data.frejun_call_log — one row per FreJun call, refreshed every
+# 30 min by the frejun-call-log-ingestion service (Cloud Scheduler frejun-call-log-sync).
+# NOTE: FreJun's `call_duration` (stored as duration_seconds) is actually MINUTES of
+# talk time — e.g. 0.436 on a call whose start→end span is 38 s. We convert ×60 here.
+FJ_TABLE = f"`{PROJECT}.frejun_data.frejun_call_log`"
+FJ_STATE = f"`{PROJECT}.frejun_data.frejun_sync_state`"
+_FJ_CACHE_S = 300
+_fj_cache = {"gz": None, "at": 0.0}
+_fj_lock = threading.Lock()
+
+
+def _fj_payload() -> dict:
+    """Call-level positional rows + matched Zoho deals + agent names."""
+    q_calls = f"""
+        SELECT call_id, UNIX_SECONDS(call_start) t, LOWER(creator) agent,
+               COALESCE(call_status, '') status, COALESCE(call_type, '') dir,
+               CAST(ROUND(COALESCE(duration_seconds, 0) * 60) AS INT64) talk,
+               GREATEST(COALESCE(TIMESTAMP_DIFF(call_end, call_start, SECOND), 0), 0) span,
+               RIGHT(REGEXP_REPLACE(COALESCE(phone_number, ''), r'[^0-9]', ''), 10) phone,
+               NULLIF(TRIM(contact_name), '') name,
+               NULLIF(TRIM(call_outcome), '') outcome,
+               NULLIF(TRIM(notes), '') notes,
+               COALESCE(recording_url, '') != '' OR COALESCE(sharable_url, '') != '' rec
+        FROM {FJ_TABLE}
+        WHERE call_start IS NOT NULL
+        ORDER BY t"""
+    # Every Zoho deal whose mobile was dialled, plus every deal created since the
+    # first FreJun call (for speed-to-first-call / never-called-on-FreJun).
+    q_deals = f"""
+        WITH fj AS (
+          SELECT DISTINCT RIGHT(REGEXP_REPLACE(COALESCE(phone_number,''), r'[^0-9]', ''), 10) p
+          FROM {FJ_TABLE}),
+        first_call AS (SELECT MIN(call_start) t0 FROM {FJ_TABLE}),
+        d AS (
+          SELECT id, UNIX_SECONDS(created_time) created, owner_name,
+                 JSON_VALUE(data, '$.Stage') stage,
+                 JSON_VALUE(data, '$.Lead_Source') source,
+                 JSON_VALUE(data, '$.Deal_Name') deal_name,
+                 RIGHT(REGEXP_REPLACE(COALESCE(JSON_VALUE(data, '$.Mobile'), ''), r'[^0-9]', ''), 10) p
+          FROM `{PROJECT}.{DATASET}.cdc_deals`)
+        SELECT d.* FROM d, first_call
+        WHERE LENGTH(d.p) = 10
+          AND (d.p IN (SELECT p FROM fj) OR TIMESTAMP_SECONDS(d.created) >= TIMESTAMP_TRUNC(first_call.t0, DAY))"""
+    q_users = f"""
+        SELECT LOWER(email) email, ANY_VALUE(full_name) full_name
+        FROM `{PROJECT}.{DATASET}.{USERS_TABLE}` WHERE email IS NOT NULL GROUP BY 1"""
+    q_meta = f"""
+        SELECT (SELECT MAX(call_start) FROM {FJ_TABLE}) latest_call,
+               (SELECT MAX(_updated_at) FROM {FJ_TABLE}) last_load,
+               (SELECT MAX(last_synced_at) FROM {FJ_STATE}) watermark"""
+    with ThreadPoolExecutor(4) as ex:
+        f_c, f_d, f_u, f_m = (ex.submit(lambda s=s: list(_bq.query(s).result()))
+                              for s in (q_calls, q_deals, q_users, q_meta))
+        calls, deals, users, meta = f_c.result(), f_d.result(), f_u.result(), f_m.result()[0]
+
+    agents, statuses = [], []
+    a_ix, s_ix = {}, {}
+
+    def ix(val, lst, idx):
+        if val not in idx:
+            idx[val] = len(lst)
+            lst.append(val)
+        return idx[val]
+
+    rows = []
+    for r in calls:
+        rows.append([r["t"], ix(r["agent"] or "", agents, a_ix), ix(r["status"], statuses, s_ix),
+                     1 if r["dir"] == "incoming" else 0, r["talk"], r["span"], r["phone"] or "",
+                     r["name"] or "", r["outcome"] or "", r["notes"] or "", 1 if r["rec"] else 0,
+                     r["call_id"]])
+    names = {u["email"]: u["full_name"] for u in users}
+    return {
+        "meta": {"generated": int(time.time()),
+                 "latest_call": meta["latest_call"].timestamp() if meta["latest_call"] else None,
+                 "last_load": meta["last_load"].timestamp() if meta["last_load"] else None,
+                 "watermark": meta["watermark"].timestamp() if meta["watermark"] else None,
+                 "rows": len(rows)},
+        "cols": ["t", "agent", "status", "incoming", "talk_s", "span_s", "phone", "name",
+                 "outcome", "notes", "rec", "call_id"],
+        "agents": [{"email": a, "name": names.get(a) or a.split("@")[0]} for a in agents],
+        "statuses": statuses,
+        "calls": rows,
+        "deal_cols": ["id", "created", "owner", "stage", "source", "deal_name", "phone"],
+        "deals": [[d["id"], d["created"], d["owner_name"] or "", d["stage"] or "", d["source"] or "",
+                   d["deal_name"] or "", d["p"]] for d in deals],
+    }
+
+
+@app.route("/api/frejun-calls")
+def api_frejun_calls():
+    """All FreJun calls (positional rows, gzipped), cached 5 min. ?refresh=1 bypasses."""
+    try:
+        with _fj_lock:
+            if (request.args.get("refresh") == "1" or not _fj_cache["gz"]
+                    or time.time() - _fj_cache["at"] > _FJ_CACHE_S):
+                body = json.dumps(_fj_payload(), separators=(",", ":"), default=str).encode()
+                _fj_cache.update(gz=gzip.compress(body, 6), at=time.time())
+            gz = _fj_cache["gz"]
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+    hdr = {"Cache-Control": "no-store", "Vary": "Accept-Encoding"}
+    if "gzip" in (request.headers.get("Accept-Encoding") or "").lower():
+        return Response(gz, 200, {**hdr, "Content-Encoding": "gzip"}, mimetype="application/json")
+    return Response(gzip.decompress(gz), 200, hdr, mimetype="application/json")
+
+
+@app.route("/api/frejun-calls/recording")
+def api_frejun_recording():
+    """Signed recording / share links for one call (kept out of the bulk payload)."""
+    cid = (request.args.get("id") or "").strip()
+    if not cid:
+        return jsonify(error="id required"), 400
+    rows = list(_bq.query(
+        f"SELECT recording_url, sharable_url FROM {FJ_TABLE} WHERE call_id = @id LIMIT 1",
+        job_config=bigquery.QueryJobConfig(query_parameters=[_P("id", "STRING", cid)])).result())
+    if not rows:
+        return jsonify(error="not found"), 404
+    return jsonify(recording_url=rows[0]["recording_url"], sharable_url=rows[0]["sharable_url"])
 
 
 @app.route("/api/customer_events")
