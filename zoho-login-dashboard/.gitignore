@@ -1,0 +1,4 @@
+# CRM data snapshots served as fallbacks: contain customer names / numbers, never commit
+static/data.js
+static/walkin_source_data.js
+__pycache__/
