@@ -93,6 +93,20 @@ All work done on 2026-07-11 (Cloud Run revisions in parentheses).
 - Overview `meetagg` (local edit carried over, NOT yet deployed): meetings counted by
   `created_time` in range instead of `Start_DateTime`.
 
+## v8 — login-hour hygiene (rev 00139) + phone fix restored (2026-11-07)
+- Revision 00139 (deployed 2026-11-06 from a working copy that was NOT this repo) added
+  login-hour hygiene: polled online time counts only 08:00-22:00 IST, and on days an agent
+  never logged out, nothing later than 1 h after their last own call/task/meeting/deal
+  (`WORK_START_HOUR`, `WORK_END_HOUR`, `IDLE_GRACE_SECONDS`; `_counted_online_ctes`).
+  Dashboard shows the uncounted idle hours as a tooltip on "Login (polled)".
+- That deploy was based on pre-00138 code, so it silently REVERTED the v7 `_build_crm_bundle`
+  phone fix: 6 Nov showed 561 of 714 deals as "Pending Call" although the calls were logged
+  in Zoho (To_Number__s populated, Subject without number). Fix re-applied on top of 00139.
+- The v7 "meetagg by created_time" local edit was never deployed and is dropped so the repo
+  matches production.
+- Rule for future deploys: always deploy from this repo (or copy main.py from it) so one
+  change does not undo another.
+
 ## Open items
 - Lock down public access to the dashboard.
 - Rotate the Zoho admin password (was shared in chat during setup).

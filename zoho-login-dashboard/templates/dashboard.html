@@ -573,7 +573,7 @@ async function loadUsers(){
         <td>${u.is_online?'<span class="pill on">online</span>':'<span class="pill off">offline</span>'}</td>
         <td class="num">${u.active_hours}</td>
         <td class="muted">${esc(u.last_activity)||'—'}</td>
-        <td class="num">${fmtDur(u.online_hours)}</td>
+        <td class="num"${u.idle_online_hours>0?` title="Zoho also showed online for ${fmtDur(u.idle_online_hours)} that is NOT counted (overnight, or CRM left open after the last call/task)"`:''}>${fmtDur(u.online_hours)}</td>
         <td class="num">${u.deals_created}</td>
         <td class="num">${u.won_deals}</td>
         <td class="num">${fmtInr(u.won_amount)}</td>
@@ -584,7 +584,7 @@ async function loadUsers(){
         <td class="num">${u.online_acts}</td>
       </tr>`).join('');
     el.innerHTML = `<div class="tblwrap"><table>
-      <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Online</th>        <th class="num">Active hrs</th><th>Last activity</th><th class="num">Login (polled)</th>
+      <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Online</th>        <th class="num" title="Distinct clock-hours with the agent's own calls / tasks / meetings (customer website events not counted)">Active hrs</th><th>Last activity</th><th class="num" title="Zoho online time between 08:00 and 22:00 IST. If the agent never logged out, time more than 1 h after their last own call/task is not counted.">Login (polled)</th>
         <th class="num">Deals</th><th class="num">Won</th><th class="num">Won value</th>
         <th class="num">Calls</th><th class="num">Talk time</th><th class="num">Meetings</th>
         <th class="num">Tasks</th><th class="num">Online acts</th></tr></thead>
