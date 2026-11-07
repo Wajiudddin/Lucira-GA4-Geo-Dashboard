@@ -888,6 +888,11 @@ TZ = "Asia/Kolkata"
 POLL_CAP_SECONDS = int(os.environ.get("POLL_CAP_SECONDS", "1800"))       # cap per interval
 SESSION_GAP_SECONDS = int(os.environ.get("SESSION_GAP_SECONDS", "1800")) # >gap => new session
 POLL_INTERVAL_SECONDS = int(os.environ.get("POLL_INTERVAL_SECONDS", "900"))  # session tail credit
+# Login-hour hygiene (see _counted_online_ctes). Zoho keeps an agent "online" as long
+# as the CRM tab/app stays open, so an agent who never logs out shows online all night.
+WORK_START_HOUR = int(os.environ.get("WORK_START_HOUR", "8"))       # IST, inclusive
+WORK_END_HOUR = int(os.environ.get("WORK_END_HOUR", "22"))          # IST, exclusive
+IDLE_GRACE_SECONDS = int(os.environ.get("IDLE_GRACE_SECONDS", "3600"))  # after last own action
 FILTER_KEYS = ("role", "profile", "status", "online", "q")
 
 
@@ -948,11 +953,71 @@ def _ser_user(r):
     d["modified_time"] = _ist_str(d.get("modified_time"), "%d %b %Y %H:%M")
     d["last_seen_online"] = _ist_str(d.get("last_seen_online"), "%d %b %H:%M")
     d["online_hours"] = round(float(d.get("online_hours") or 0), 2)
+    d["idle_online_hours"] = round(float(d.get("idle_online_hours") or 0), 2)
     d["won_amount"] = float(d.get("won_amount") or 0)
     d["talk_min"] = round(float(d.get("talk_min") or 0), 1)
     d["first_activity"] = _ist_str(d.get("first_activity"), "%d %b %H:%M")
     d["last_activity"] = _ist_str(d.get("last_activity"), "%d %b %H:%M")
     return d
+
+
+def _online_params():
+    return [_P("cap", "INT64", POLL_CAP_SECONDS), _P("ws", "INT64", WORK_START_HOUR),
+            _P("we", "INT64", WORK_END_HOUR), _P("grace", "INT64", IDLE_GRACE_SECONDS)]
+
+
+def _counted_online_ctes(ts_from, ts_to, uid_filter=""):
+    """CTEs `snap` + `snapc`: every status poll with its capped length `sec`
+    (seconds until the agent's next poll, max @cap) and a `counted` flag.
+
+    Zoho reports an agent online for as long as the CRM tab/app stays open, so an
+    agent who never logs out looks online all night (Farha Ansari, 06 Nov 2026:
+    7h30m polled = 4h of 00:00-04:00 left open + 3h30m real). An online poll
+    counts as login time only if:
+      1. it falls between @ws and @we IST (real calls happen 09-21h), and
+      2. on a day the agent was still online at @we (= forgot to log out), it is
+         no later than @grace after their last OWN CRM action that day (call
+         made, task / meeting / deal they created). Without any own action that
+         day, rule 1 alone applies.
+    ts_from / ts_to are SQL expressions; needs the params from _online_params()."""
+    S = f"`{PROJECT}.{DATASET}.{SNAP_TABLE}`"
+    ds = f"`{PROJECT}.{DATASET}"
+    return f"""
+    snap AS (
+      SELECT user_id, snapshot_time, is_online,
+        DATE(snapshot_time, '{TZ}') AS d,
+        EXTRACT(HOUR FROM DATETIME(snapshot_time, '{TZ}')) AS hr,
+        LEAST(TIMESTAMP_DIFF(LEAD(snapshot_time) OVER (PARTITION BY user_id ORDER BY snapshot_time),
+                             snapshot_time, SECOND), @cap) AS sec
+      FROM {S}
+      WHERE snapshot_time >= {ts_from} AND snapshot_time < {ts_to} {uid_filter}
+    ),
+    own_act AS (
+      SELECT owner_id AS user_id,
+             SAFE.PARSE_TIMESTAMP('%FT%T%Ez', JSON_VALUE(data,'$.Call_Start_Time')) AS a_ts
+      FROM {ds}.cdc_calls`
+      UNION ALL SELECT JSON_VALUE(data,'$.Created_By.id'), created_time FROM {ds}.cdc_tasks`
+      UNION ALL SELECT JSON_VALUE(data,'$.Created_By.id'), created_time FROM {ds}.cdc_meetings`
+      UNION ALL SELECT JSON_VALUE(data,'$.Created_By.id'), created_time FROM {ds}.cdc_deals`
+    ),
+    last_act AS (
+      SELECT user_id, DATE(a_ts, '{TZ}') AS d, MAX(a_ts) AS last_act
+      FROM own_act WHERE a_ts >= {ts_from} AND a_ts < {ts_to}
+      GROUP BY 1, 2
+    ),
+    day_flag AS (
+      SELECT user_id, d, LOGICAL_OR(is_online AND hr >= @we) AS ran_late
+      FROM snap GROUP BY 1, 2
+    ),
+    snapc AS (
+      SELECT s.*,
+        (s.is_online AND s.hr >= @ws AND s.hr < @we
+         AND NOT (f.ran_late AND la.last_act IS NOT NULL
+                  AND s.snapshot_time > TIMESTAMP_ADD(la.last_act, INTERVAL @grace SECOND))) AS counted
+      FROM snap s
+      JOIN day_flag f USING (user_id, d)
+      LEFT JOIN last_act la USING (user_id, d)
+    )"""
 
 
 def _users_query(d_from, d_to, filt, user_id=None):
@@ -964,10 +1029,7 @@ def _users_query(d_from, d_to, filt, user_id=None):
     MEET = f"`{PROJECT}.{DATASET}.cdc_meetings`"
     TASKS = f"`{PROJECT}.{DATASET}.cdc_tasks`"
     OACT = f"`{PROJECT}.{DATASET}.cdc_online_activities`"
-    params = [
-        _P("d_from", "DATE", d_from), _P("d_to", "DATE", d_to),
-        _P("cap", "INT64", POLL_CAP_SECONDS),
-    ]
+    params = [_P("d_from", "DATE", d_from), _P("d_to", "DATE", d_to)] + _online_params()
     where = ["1=1"]
     if user_id:
         where.append("u.user_id=@uid"); params.append(_P("uid", "STRING", user_id))
@@ -983,23 +1045,22 @@ def _users_query(d_from, d_to, filt, user_id=None):
         where.append("(LOWER(u.full_name) LIKE @q OR LOWER(u.email) LIKE @q)")
         params.append(_P("q", "STRING", f"%{filt['q'].lower()}%"))
 
+    online_ctes = _counted_online_ctes(
+        f"TIMESTAMP(@d_from, '{TZ}')", f"TIMESTAMP(DATE_ADD(@d_to, INTERVAL 1 DAY), '{TZ}')")
     sql = f"""
     WITH rng AS (
       SELECT TIMESTAMP(@d_from, '{TZ}') AS ts_from,
              TIMESTAMP(DATE_ADD(@d_to, INTERVAL 1 DAY), '{TZ}') AS ts_to
     ),
-    snap AS (
-      SELECT user_id, snapshot_time, is_online,
-        LEAD(snapshot_time) OVER (PARTITION BY user_id ORDER BY snapshot_time) AS nx
-      FROM {S}, rng
-      WHERE snapshot_time >= rng.ts_from AND snapshot_time < rng.ts_to
-    ),
+    {online_ctes},
     online AS (
+      -- login hours = counted online polls only (no overnight / left-open CRM tab)
       SELECT user_id,
-        SUM(IF(is_online, LEAST(TIMESTAMP_DIFF(nx, snapshot_time, SECOND), @cap), 0))/3600.0 AS online_hours,
-        COUNT(DISTINCT IF(is_online, DATE(snapshot_time, '{TZ}'), NULL)) AS active_days,
+        SUM(IF(counted, sec, 0))/3600.0 AS online_hours,
+        SUM(IF(is_online AND NOT counted, sec, 0))/3600.0 AS idle_online_hours,
+        COUNT(DISTINCT IF(counted, d, NULL)) AS active_days,
         MAX(IF(is_online, snapshot_time, NULL)) AS last_seen_online
-      FROM snap GROUP BY user_id
+      FROM snapc GROUP BY user_id
     ),
     dealsagg AS (
       -- strictly range-scoped: created by Created_Time, won by Closing_Date in range
@@ -1025,8 +1086,8 @@ def _users_query(d_from, d_to, filt, user_id=None):
     meetagg AS (
       SELECT m.owner_id AS user_id, COUNT(*) AS meetings
       FROM {MEET} m, rng
-      -- "raised" = created in range (matches Zoho's Created Time), not the scheduled start
-      WHERE m.created_time >= rng.ts_from AND m.created_time < rng.ts_to
+      WHERE SAFE.PARSE_TIMESTAMP('%FT%T%Ez', JSON_VALUE(m.data,'$.Start_DateTime')) >= rng.ts_from
+        AND SAFE.PARSE_TIMESTAMP('%FT%T%Ez', JSON_VALUE(m.data,'$.Start_DateTime')) < rng.ts_to
       GROUP BY 1
     ),
     tasksagg AS (
@@ -1045,19 +1106,24 @@ def _users_query(d_from, d_to, filt, user_id=None):
       GROUP BY 1
     ),
     presagg AS (
-      -- activity-derived presence for every agent (covers pre-polling history)
+      -- activity-derived presence for every agent (covers pre-polling history).
+      -- Agent work only: online_activity = the CUSTOMER's website events (they
+      -- happen at 1 am too), and meetings scheduled for later today haven't
+      -- happened yet - neither proves the agent was working.
       SELECT owner_id AS user_id,
         MIN(activity_time) AS first_activity,
         MAX(activity_time) AS last_activity,
         COUNT(DISTINCT FORMAT_TIMESTAMP('%F-%H', activity_time, '{TZ}')) AS active_hours
       FROM `{PROJECT}.{DATASET}.all_activity`, rng
-      WHERE activity_type IN ('call','task','meeting','online_activity')
+      WHERE activity_type IN ('call','task','meeting')
         AND activity_time >= rng.ts_from AND activity_time < rng.ts_to
+        AND activity_time <= CURRENT_TIMESTAMP()
       GROUP BY 1
     )
     SELECT u.user_id, u.full_name, u.email, u.role, u.profile, u.status,
            u.is_online, u.modified_time,
            COALESCE(o.online_hours,0) AS online_hours,
+           COALESCE(o.idle_online_hours,0) AS idle_online_hours,
            COALESCE(o.active_days,0) AS active_days,
            o.last_seen_online,
            COALESCE(da.deals_created,0) AS deals_created,
@@ -1142,17 +1208,15 @@ def _sessions_for(d_from, d_to, user_id):
 
 
 def _daily_for(d_from, d_to, user_id):
-    S = f"`{PROJECT}.{DATASET}.{SNAP_TABLE}`"
     params = [_P("d_from", "DATE", d_from), _P("d_to", "DATE", d_to),
-              _P("uid", "STRING", user_id), _P("cap", "INT64", POLL_CAP_SECONDS)]
+              _P("uid", "STRING", user_id)] + _online_params()
+    online_ctes = _counted_online_ctes(
+        f"TIMESTAMP(@d_from,'{TZ}')", f"TIMESTAMP(DATE_ADD(@d_to,INTERVAL 1 DAY),'{TZ}')",
+        "AND user_id=@uid")
     rows = _bq.query(f"""
-        WITH rng AS (SELECT TIMESTAMP(@d_from,'{TZ}') a, TIMESTAMP(DATE_ADD(@d_to,INTERVAL 1 DAY),'{TZ}') b),
-        snap AS (SELECT snapshot_time, is_online,
-                   LEAD(snapshot_time) OVER (ORDER BY snapshot_time) nx
-                 FROM {S}, rng WHERE user_id=@uid AND snapshot_time>=rng.a AND snapshot_time<rng.b)
-        SELECT FORMAT_DATE('%d %b', DATE(snapshot_time,'{TZ}')) day,
-          SUM(IF(is_online, LEAST(TIMESTAMP_DIFF(nx,snapshot_time,SECOND),@cap),0))/3600.0 hrs
-        FROM snap GROUP BY day, DATE(snapshot_time,'{TZ}') ORDER BY DATE(snapshot_time,'{TZ}')
+        WITH {online_ctes}
+        SELECT FORMAT_DATE('%d %b', d) day, SUM(IF(counted, sec, 0))/3600.0 hrs
+        FROM snapc GROUP BY day, d ORDER BY d
     """, job_config=bigquery.QueryJobConfig(query_parameters=params)).result()
     return [{"day": r["day"], "hrs": round(float(r["hrs"] or 0), 2)} for r in rows]
 
@@ -1868,18 +1932,15 @@ def api_team_hourly():
     d_from, d_to = _parse_range(request.args)
     S = f"`{PROJECT}.{DATASET}.{SNAP_TABLE}`"
     C = f"`{PROJECT}.{DATASET}.cdc_calls`"
-    params = [_P("d_from", "DATE", d_from), _P("d_to", "DATE", d_to),
-              _P("cap", "INT64", POLL_CAP_SECONDS)]
+    params = [_P("d_from", "DATE", d_from), _P("d_to", "DATE", d_to)] + _online_params()
+    online_ctes = _counted_online_ctes(
+        f"TIMESTAMP(@d_from,'{TZ}')", f"TIMESTAMP(DATE_ADD(@d_to,INTERVAL 1 DAY),'{TZ}')")
     sql = f"""
     WITH rng AS (SELECT TIMESTAMP(@d_from,'{TZ}') a, TIMESTAMP(DATE_ADD(@d_to,INTERVAL 1 DAY),'{TZ}') b),
-    snap AS (
-      SELECT snapshot_time, is_online,
-        LEAD(snapshot_time) OVER (PARTITION BY user_id ORDER BY snapshot_time) nx
-      FROM {S}, rng WHERE snapshot_time>=rng.a AND snapshot_time<rng.b),
+    {online_ctes},
     onl AS (
-      SELECT EXTRACT(HOUR FROM DATETIME(snapshot_time,'{TZ}')) hr,
-        SUM(IF(is_online, LEAST(TIMESTAMP_DIFF(nx,snapshot_time,SECOND),@cap),0))/60.0 mins
-      FROM snap GROUP BY hr),
+      SELECT hr, SUM(IF(counted, sec, 0))/60.0 mins
+      FROM snapc GROUP BY hr),
     cls AS (
       SELECT EXTRACT(HOUR FROM DATETIME(SAFE.PARSE_TIMESTAMP('%FT%T%Ez',JSON_VALUE(data,'$.Call_Start_Time')),'{TZ}')) hr,
         COUNT(*) calls
@@ -2011,26 +2072,27 @@ def api_user_hourly(user_id):
     S = f"`{PROJECT}.{DATASET}.{SNAP_TABLE}`"
     C = f"`{PROJECT}.{DATASET}.cdc_calls`"
     params = [_P("d_from", "DATE", d_from), _P("d_to", "DATE", d_to),
-              _P("cap", "INT64", POLL_CAP_SECONDS), _P("uid", "STRING", user_id)]
+              _P("uid", "STRING", user_id)] + _online_params()
+    online_ctes = _counted_online_ctes(
+        f"TIMESTAMP(@d_from,'{TZ}')", f"TIMESTAMP(DATE_ADD(@d_to,INTERVAL 1 DAY),'{TZ}')",
+        "AND user_id=@uid")
     sql = f"""
     WITH rng AS (SELECT TIMESTAMP(@d_from,'{TZ}') a, TIMESTAMP(DATE_ADD(@d_to,INTERVAL 1 DAY),'{TZ}') b),
-    snap AS (
-      SELECT snapshot_time, is_online,
-        LEAD(snapshot_time) OVER (ORDER BY snapshot_time) nx
-      FROM {S}, rng WHERE user_id=@uid AND snapshot_time>=rng.a AND snapshot_time<rng.b),
+    {online_ctes},
     onl AS (
-      SELECT DATE(snapshot_time,'{TZ}') day, EXTRACT(HOUR FROM DATETIME(snapshot_time,'{TZ}')) hr,
-        SUM(IF(is_online, LEAST(TIMESTAMP_DIFF(nx,snapshot_time,SECOND),@cap),0))/60.0 mins
-      FROM snap GROUP BY day, hr),
+      SELECT d AS day, hr, SUM(IF(counted, sec, 0))/60.0 mins
+      FROM snapc GROUP BY day, hr),
     cls AS (
-      -- presence evidence from the unified activity feed (calls/tasks/meetings/online)
+      -- presence evidence = the agent's own work (calls/tasks/meetings); customer
+      -- online_activity and not-yet-happened meetings are not agent presence
       SELECT DATE(activity_time,'{TZ}') day,
         EXTRACT(HOUR FROM DATETIME(activity_time,'{TZ}')) hr,
         COUNTIF(activity_type='call') calls, COUNT(*) acts
       FROM `{PROJECT}.{DATASET}.all_activity`, rng
       WHERE owner_id=@uid
-        AND activity_type IN ('call','task','meeting','online_activity')
+        AND activity_type IN ('call','task','meeting')
         AND activity_time >= rng.a AND activity_time < rng.b
+        AND activity_time <= CURRENT_TIMESTAMP()
       GROUP BY day, hr)
     SELECT COALESCE(o.day,c.day) day, COALESCE(o.hr,c.hr) hr,
            COALESCE(o.mins,0) mins, COALESCE(c.calls,0) calls, COALESCE(c.acts,0) acts
@@ -2185,8 +2247,9 @@ def api_user_overview(user_id):
         SELECT MIN(activity_time) first_act, MAX(activity_time) last_act,
                COUNT(DISTINCT FORMAT_TIMESTAMP('%F-%H', activity_time, '{TZ}')) active_hours
         FROM {A}, rng
-        WHERE owner_id=@uid AND activity_type IN ('call','task','meeting','online_activity')
+        WHERE owner_id=@uid AND activity_type IN ('call','task','meeting')
           AND activity_time >= rng.a AND activity_time < rng.b
+          AND activity_time <= CURRENT_TIMESTAMP()
     """, job_config=bigquery.QueryJobConfig(query_parameters=[
         _P("d_from", "DATE", d_from), _P("d_to", "DATE", d_to),
         _P("uid", "STRING", user_id)])).result())[0]
